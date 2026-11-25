@@ -2,6 +2,9 @@ services:
   web:
     build: .
     restart: unless-stopped
+    networks:
+      proxy:
+        aliases: [norte-inercial-web]
     ports:
       - "127.0.0.1:${WEB_PORT:-8197}:8080"
     cap_drop: [ALL]
@@ -13,3 +16,8 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+networks:
+  proxy:
+    external: true
+    name: automacao-net
