@@ -29,3 +29,7 @@
   .controls{padding-top:16px}
   footer{padding:12px clamp(12px,2vw,24px)}
 }
+
+/* Each 48 CSS pixels represents one metre on both axes. */
+.field{background-position:calc(50% + 24px) calc(50% + 24px)}
+.crosshair{top:50%;left:50%;transform:translate(-50%,-7.5px)}
