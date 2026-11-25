@@ -25,3 +25,6 @@ dist-ssr
 
 .playwright-cli/
 .agents/
+
+# Dados RoNIN são mantidos fora do repositório e das imagens
+data/
