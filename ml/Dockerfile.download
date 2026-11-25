@@ -1,0 +1,6 @@
+FROM python:3.12-alpine
+RUN apk add --no-cache curl unzip
+COPY download-container.sh /usr/local/bin/download-container
+COPY extract_ronin.py /usr/local/bin/extract_ronin.py
+RUN chmod 755 /usr/local/bin/download-container
+ENTRYPOINT ["/usr/local/bin/download-container"]

@@ -6,18 +6,18 @@ export function readPartialMotion(event: DeviceMotionEvent, time = performance.n
   const a = event.accelerationIncludingGravity
   const r = event.rotationRate
   const rad = (n: number | null | undefined) => { const value = finite(n); return value === null ? null : value * Math.PI / 180 }
-  return {time, acceleration:{x:finite(a?.x),y:finite(a?.y),z:finite(a?.z)}, rotation:{x:rad(r?.beta),y:rad(r?.gamma),z:rad(r?.alpha)}}
+  return {time, acceleration:{x:finite(a?.x),y:finite(a?.y),z:finite(a?.z)}, rotation:{x:rad(r?.alpha),y:rad(r?.beta),z:rad(r?.gamma)}}
 }
 export type Sample = { time: number; acceleration: Vector; rotation: Vector }
 const vector = (v: {x: number | null; y: number | null; z: number | null} | null): Vector | null => {
   if (!v || v.x == null || v.y == null || v.z == null || ![v.x,v.y,v.z].every(Number.isFinite)) return null
   return {x:v.x,y:v.y,z:v.z}
 }
-/** Browser rotationRate: beta=x, gamma=y, alpha=z, degrees/s. */
+/** W3C DeviceMotionEvent rotationRate: alpha=x, beta=y, gamma=z, degrees/s. */
 export function readMotion(event: DeviceMotionEvent, time = performance.now()): Sample | null {
   const acceleration = vector(event.accelerationIncludingGravity)
   const r = event.rotationRate
-  const degrees = r ? vector({x:r.beta,y:r.gamma,z:r.alpha}) : null
+  const degrees = r ? vector({x:r.alpha,y:r.beta,z:r.gamma}) : null
   if (!acceleration || !degrees || !Number.isFinite(time)) return null
   const factor = Math.PI / 180
   return {time, acceleration, rotation:{x:degrees.x*factor,y:degrees.y*factor,z:degrees.z*factor}}

@@ -12,7 +12,7 @@ A VPS possui Nginx Proxy Manager em Docker nas portas 80/443 e outros serviços 
 
 `docker compose build` e `docker compose up -d` executam a interface experimental somente em 127.0.0.1:8197. `curl http://127.0.0.1:8197/health` verifica o servidor. Isso não oferece HTTPS nem habilita sensores em telefones remotos. `docker compose down` remove apenas os recursos deste Compose.
 
-O navegador informa aceleração incluindo gravidade em m/s² e rotação em graus/s, convertida para rad/s (beta→X, gamma→Y, alpha→Z). Valores ausentes são rejeitados. Convenções e sinais dependem do navegador e precisam de validação física antes de qualquer integração com treinamento. A frequência exibida é calculada sobre as últimas 100 leituras. Os dados ficam na memória do navegador e não são transmitidos pelo código da aplicação.
+O navegador informa aceleração incluindo gravidade em m/s² e rotação em graus/s, convertida para rad/s (alpha→X, beta→Y, gamma→Z, conforme a especificação W3C atual; confirmar em cada navegador). Valores ausentes são rejeitados. Convenções e sinais dependem do navegador e precisam de validação física antes de qualquer integração com treinamento. A frequência exibida é calculada sobre as últimas 100 leituras. Os dados ficam na memória do navegador e não são transmitidos pelo código da aplicação.
 
 ## Próximos passos
 
