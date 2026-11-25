@@ -31,7 +31,9 @@
 }
 
 /* Each 48 CSS pixels represents one metre on both axes. */
-.field{background-position:calc(50% + 24px) calc(50% + 24px)}
-.crosshair{top:50%;left:50%;transform:translate(-50%,-7.5px)}
+.field{background-position:calc(50% + 24px + var(--pan-x, 0px)) calc(50% + 24px + var(--pan-y, 0px));touch-action:none;user-select:none;cursor:grab}
+.crosshair{top:calc(50% + var(--pan-y, 0px));left:calc(50% + var(--pan-x, 0px));transform:translate(-50%,-7.5px);pointer-events:none}
 
 .processing-status{font-size:12px;color:#376b6e;margin:16px 0 0}
+
+.field:active{cursor:grabbing}.field:focus-visible{outline:3px solid #e4a72d;outline-offset:3px}.center-map{position:absolute;right:20px;top:48px;z-index:1;padding:9px 12px;border-radius:5px;background:#fff;color:#23666c;font-size:12px;box-shadow:0 2px 8px #16383b14;touch-action:manipulation}.field-top,.field-foot,.model-note{pointer-events:none}
