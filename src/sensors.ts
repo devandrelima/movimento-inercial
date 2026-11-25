@@ -33,3 +33,20 @@ export async function motionPermission(): Promise<'granted'|'denied'|'unavailabl
   if (!klass.requestPermission) return 'granted'
   try { return await klass.requestPermission() === 'granted' ? 'granted' : 'denied' } catch { return 'denied' }
 }
+
+export type OrientationSample = { time: number; alpha: number | null; beta: number | null; gamma: number | null; absolute: boolean }
+export function readOrientation(event: DeviceOrientationEvent, time = performance.now()): OrientationSample {
+  return {time, alpha:finite(event.alpha), beta:finite(event.beta), gamma:finite(event.gamma), absolute:event.absolute === true}
+}
+/** Both requests start in the click handler before awaiting, preserving user activation. */
+export function sensorPermissions(): Promise<{motion: 'granted'|'denied'|'unavailable'; orientation: 'granted'|'denied'|'unavailable'}> {
+  const motion = motionPermission()
+  const orientation = (() => {
+    if (!window.isSecureContext || typeof DeviceOrientationEvent === 'undefined') return Promise.resolve('unavailable' as const)
+    const klass = DeviceOrientationEvent as typeof DeviceOrientationEvent & {requestPermission?: () => Promise<string>}
+    if (!klass.requestPermission) return Promise.resolve('granted' as const)
+    try { return klass.requestPermission().then(result => result === 'granted' ? 'granted' as const : 'denied' as const, () => 'denied' as const) }
+    catch { return Promise.resolve('denied' as const) }
+  })()
+  return Promise.all([motion,orientation]).then(([m,o]) => ({motion:m,orientation:o}))
+}

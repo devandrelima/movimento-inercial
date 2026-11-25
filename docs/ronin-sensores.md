@@ -12,7 +12,7 @@ A rotina original `source/data_glob_speed.py` do repositório oficial aplica bia
 |---|---|---|
 | `synced/acce` | `devicemotion.accelerationIncludingGravity` | Ambos contemplam gravidade; calibração, sinal, referencial e processamento do sistema devem ser comparados fisicamente. |
 | `synced/gyro` ou `gyro_uncalib` | `devicemotion.rotationRate` | O evento está em graus/s e deve ser convertido para rad/s. O RoNIN usa calibração dependente do dispositivo; não assumir que o navegador exponha o mesmo sinal bruto. |
-| `synced/game_rv` | `deviceorientation` relativo, em evento separado | Quaternion e ângulos Euler não são diretamente intercambiáveis sem definir convenção, referencial, sincronização e offset. `absolute=false` não garante norte. A interface atual não coleta orientação. |
+| `synced/game_rv` | `deviceorientation` relativo, em evento separado | Quaternion e ângulos Euler não são diretamente intercambiáveis sem definir convenção, referencial, sincronização e offset. `absolute=false` não garante norte. A interface agora coleta eventos de orientação separadamente, com seu próprio timestamp; ainda não há sincronização, transformação para quaternion ou alinhamento implementados. |
 | `pose/tango_pos` | Não disponível | Referência de posição para construir deslocamentos e medir erro, nunca entrada da inferência. |
 | `synced/time`, 200 Hz nesta sequência | Tempos monotônicos de evento, aproximadamente 60 Hz no segundo telefone | Ajustar frequências por reamostragem temporal, filtro antialias antes de reduzir frequência e política explícita para lacunas. Não inventar alta frequência a partir de 60 Hz. |
 
@@ -21,3 +21,7 @@ A coleta do segundo aparelho teve 1.853 eventos de movimento em 30,85 s (~60 Hz)
 ## Dados ainda necessários
 
 Este arquivo é somente parte do treino. Precisamos de conjuntos independentes de validação e teste, com separação por trajetórias ou participantes e protocolo documentado. Uma amostra não representa todo o conjunto. O inventário automático produzirá `data/ronin/comparacao-inventario.json` após download, extração e validação completos; seu status fica em `data/ronin/inventory.status`. O arquivo não contém métricas de modelo.
+
+## Captura no navegador
+
+A interface registra `devicemotion` e `deviceorientation` em linhas separadas, com relógio monotônico e marcadores `inicio` e `pausa`. Os campos `gravidade_x_m_s2`, `gravidade_y_m_s2` e `gravidade_z_m_s2` são nomes históricos: contêm `accelerationIncludingGravity` (aceleração total incluindo gravidade), não gravidade isolada. Os demais campos do CSV permanecem nas unidades originais do navegador; o gráfico de giroscópio usa rad/s. A coleta de orientação pode falhar sem bloquear o diagnóstico de movimento; ausência ou recusa é exibida na tela. Um estado `absolute=false` indica referencial relativo, não norte. Os eventos ainda não foram reamostrados nem normalizados para o modelo. A avaliação final de equivalência dos referenciais depende do pipeline e de testes reais em aparelhos.

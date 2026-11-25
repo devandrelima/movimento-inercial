@@ -3,3 +3,5 @@
 .sensor-status{font-size:12px;color:#5b777d;margin-top:18px}.download{margin-left:0}.play{margin-left:auto}@media(max-width:700px){main{padding-top:16px}}
 
 @media(max-width:700px){.model-note{bottom:48px;max-width:85%;white-space:normal;text-align:center}}
+
+.orientation-status{font-size:12px;color:#5b777d;margin:12px 0 0}
