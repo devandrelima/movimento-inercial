@@ -1,6 +1,6 @@
 # Comparação inicial: RoNIN e navegador
 
-Situação: inspeção de uma sequência real (`a000_1`) do arquivo `train_dataset_1.zip`; o download e a extração integrais ainda estão em andamento. Não há modelo treinado ou métricas nesta análise.
+Situação: o arquivo `train_dataset_1.zip` foi baixado e extraído com verificação CRC. Seu inventário contém 50 trajetórias, somando aproximadamente 8,09 horas, com frequência mediana de aproximadamente 200 Hz em todas elas. Não há modelo treinado ou métricas nesta análise.
 
 A sequência extraída parcialmente teve CRC do ZIP validado. `synced/time` possui 67.610 amostras, intervalo mediano 0,005 s (200 Hz) e nenhum intervalo não crescente. Os grupos sincronizados incluem `acce`, `gyro`, `gyro_uncalib`, `game_rv`, `grav`, `linacce`, `magnet`, `rv` e `time`. A referência `pose/tango_pos` tem três coordenadas por amostra e `pose/tango_ori` tem quatro componentes; ambos servem a rótulos e avaliação, não são dados disponíveis ao navegador. A sequência possui metadados de calibração em `info.json`.
 
@@ -20,7 +20,7 @@ A coleta do segundo aparelho teve 1.853 eventos de movimento em 30,85 s (~60 Hz)
 
 ## Dados ainda necessários
 
-Este arquivo é somente parte do treino. Precisamos de conjuntos independentes de validação e teste, com separação por trajetórias ou participantes e protocolo documentado. Uma amostra não representa todo o conjunto. O inventário automático produzirá `data/ronin/comparacao-inventario.json` após download, extração e validação completos; seu status fica em `data/ronin/inventory.status`. O arquivo não contém métricas de modelo.
+Este arquivo cobre 42 das 73 sequências da lista oficial de treino e 8 das 16 sequências da lista oficial de validação; não contém as 32 sequências de teste não visto. A divisão oficial usa trajetórias distintas, mas as listas de treino e validação podem compartilhar prefixos de participante; registrar essa limitação. As 32 sequências de teste não visto estão sendo obtidas separadamente. `data/ronin/comparacao-inventario.json` contém o inventário da primeira parte e `data/ronin/split-manifest.json` registra sequências disponíveis e ausentes; ambos são evidência de dados, não métricas de modelo. O manifesto será atualizado automaticamente após a extração do teste e continuará indicando que o protocolo completo está incompleto até obter as sequências restantes. As listas vieram do repositório RoNIN no commit `805b7f0f28bb164ce89ada9ac05a9470dbe3d715`; seus SHA-256 estão no manifesto. O SHA-256 do ZIP foi calculado localmente, sem comparação a um checksum externo publicado.
 
 ## Captura no navegador
 

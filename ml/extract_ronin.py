@@ -1,7 +1,9 @@
 import json, os, shutil, stat, zipfile
 from pathlib import Path
-archive=Path('/data/train_dataset_1.zip')
-dest=Path('/data/train_dataset_1')
+name=os.environ.get('RONIN_NAME','train_dataset_1')
+if name not in {'train_dataset_1','unseen_subjects_test_set'}: raise ValueError('Nome de conjunto não permitido')
+archive=Path('/data') / (name+'.zip')
+dest=Path('/data') / name
 with zipfile.ZipFile(archive) as z:
     items=z.infolist()
     needed=sum(i.file_size for i in items)
@@ -21,6 +23,6 @@ with zipfile.ZipFile(archive) as z:
         path.parent.mkdir(parents=True, exist_ok=True)
         with z.open(i) as src, path.open('wb') as out:
             shutil.copyfileobj(src,out,1024*1024)
-    with open('/data/train_dataset_1.manifest.json','w') as f:
+    with open(Path('/data') / (name+'.manifest.json'),'w') as f:
         json.dump({'files':len(items),'uncompressed_bytes':needed},f,indent=2)
 print('Extração e CRC dos arquivos concluídos',flush=True)
