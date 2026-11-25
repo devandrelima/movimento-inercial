@@ -33,3 +33,5 @@
 /* Each 48 CSS pixels represents one metre on both axes. */
 .field{background-position:calc(50% + 24px) calc(50% + 24px)}
 .crosshair{top:50%;left:50%;transform:translate(-50%,-7.5px)}
+
+.processing-status{font-size:12px;color:#376b6e;margin:16px 0 0}
