@@ -6,11 +6,7 @@ import './Compatibility.css'
 type State='idle'|'permission'|'testing'|'success'|'failure'
 function PhoneIllustration({moving}:{moving:boolean}) {
  return <div className={`phone-art${moving?' is-moving':''}`} aria-hidden="true">
-  <svg viewBox="0 0 190 200" fill="none">
-   <circle cx="95" cy="91" r="76" stroke="#dbe9e7" strokeWidth="1"/>
-   <path d="M30 75c-7 12-8 24-6 35M160 60c8 11 12 23 12 36" stroke="#8eb8b4" strokeWidth="2" strokeLinecap="round"/>
-   <g className="phone-art-device"><rect x="66" y="22" width="59" height="111" rx="10" fill="#f5faf9" stroke="#176b6e" strokeWidth="3"/><path d="M86 29h19M91 124h10" stroke="#176b6e" strokeWidth="2.5" strokeLinecap="round"/><path d="M52 96c-3-3-8-2-9 1-2 3-1 6 2 10l22 30c5 7 7 14 8 22l2 14h61l2-21c1-8 0-17-4-24l-8-16c-3-5-9-4-10 1l-4-8c-3-5-9-3-9 2l-4-8c-3-5-9-3-9 3l-8-19c-2-5-9-4-10 1-1 2 0 5 1 7l9 24-32-19Z" fill="#e6f1ef" stroke="#176b6e" strokeWidth="3" strokeLinejoin="round"/></g>
-  </svg>
+  <img className="phone-art-device" src="/bussola.png" alt="" width="512" height="512"/>
  </div>
 }
 export default function Compatibility({onStart}:{onStart:()=>void}) {
@@ -41,9 +37,8 @@ export default function Compatibility({onStart}:{onStart:()=>void}) {
   setState('testing')
  }
  return <main className="compat-page"><div className="compat-container">
-  <div className="compat-marker"><span className="compat-compass" aria-hidden="true">✦</span><span>Navegação inercial</span></div>
   <div className="compat-content"><PhoneIllustration moving={state==='testing'}/>
-   <div className="compat-copy"><p className="compat-step">PREPARAÇÃO <span>01 / 02</span></p>
+   <div className="compat-copy">
     <h1>Teste se seu dispositivo é compatível</h1>
     {state==='idle' && <p className="compat-description">Toque para começar e balance seu celular por 5 segundos.</p>}
     {state==='permission' && <p className="compat-description" role="status">Verificando as permissões do navegador…</p>}
@@ -52,7 +47,6 @@ export default function Compatibility({onStart}:{onStart:()=>void}) {
     {state==='failure' && <p className="compat-error" role="alert">{failure}</p>}
     {(state==='idle'||state==='failure') && <button className="compat-primary" onClick={startTest}>{state==='idle'?'Testar sensores':'Tentar novamente'}<span aria-hidden="true">→</span></button>}
     {state==='success' && <button className="compat-primary" onClick={onStart}>Iniciar <span aria-hidden="true">→</span></button>}
-    <p className="compat-privacy">As leituras ficam neste dispositivo.</p>
    </div>
   </div>
  </div></main>
@@ -60,7 +54,6 @@ export default function Compatibility({onStart}:{onStart:()=>void}) {
 export function ModelLoading({error,onRetry}:{error:string|null;onRetry:()=>void}) {
  return <main className="compat-page"><div className="loading-content" role="status" aria-live="polite">
   <div className={error?'loading-symbol error':'loading-symbol'} aria-hidden="true">{error?'!':<span/>}</div>
-  <p className="compat-step">PREPARAÇÃO <span>02 / 02</span></p>
   <h1>{error?'Não foi possível carregar o modelo':'Preparando o modelo'}</h1>
   <p className="compat-description">{error||'Aguarde enquanto a inteligência é carregada no seu dispositivo.'}</p>
   {error&&<button className="compat-primary" onClick={onRetry}>Tentar novamente <span aria-hidden="true">→</span></button>}
