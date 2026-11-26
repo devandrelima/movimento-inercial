@@ -40,3 +40,8 @@
 
 .trajectory-layer{position:absolute;left:calc(50% + var(--pan-x, 0px));top:calc(50% + var(--pan-y, 0px));overflow:visible;pointer-events:none}
 .model-status{font-size:12px;line-height:1.4;color:#376b6e;margin:14px 0 0}
+/* Grid and trajectory share one scale; each square remains one metre. */
+.field{background-size:var(--grid-size,48px) var(--grid-size,48px);background-position:calc(50% + var(--grid-half,24px) + var(--pan-x,0px)) calc(50% + var(--grid-half,24px) + var(--pan-y,0px))}
+.map-zoom{position:absolute;right:18px;top:88px;display:flex;flex-direction:column;background:#fff;border:1px solid #dce7e9;border-radius:5px;overflow:hidden;z-index:1;box-shadow:0 2px 8px #16383b14}
+.map-zoom button{width:42px;height:42px;padding:0;background:#fff;color:#23666c;font-size:24px;line-height:1;border-radius:0;touch-action:manipulation}
+.map-zoom button+button{border-top:1px solid #e5eeed}.map-zoom button:disabled{opacity:.35}.map-zoom button:focus-visible{outline:2px solid #d59c30;outline-offset:-3px}
