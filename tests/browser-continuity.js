@@ -1,4 +1,11 @@
 async page => {
+ await page.getByRole('button',{name:'Testar sensores'}).click();
+ await page.evaluate(()=>{let i=0;window.checkFeed=setInterval(()=>{
+  window.dispatchEvent(new DeviceMotionEvent('devicemotion',{accelerationIncludingGravity:{x:0,y:0,z:9.81},rotationRate:{alpha:0,beta:0,gamma:0},interval:16}));
+  if(i++%3===0)window.dispatchEvent(new DeviceOrientationEvent('deviceorientation',{alpha:0,beta:0,gamma:0,absolute:false}));
+ },16)});
+ await page.getByRole('button',{name:'Iniciar',exact:true}).waitFor({timeout:9000});
+ await page.evaluate(()=>clearInterval(window.checkFeed));await page.getByRole('button',{name:'Iniciar',exact:true}).click();
  await page.waitForFunction(()=>document.querySelector('.model-status')?.textContent?.includes('pronta'),{timeout:60000});
  await page.getByRole('button',{name:'Iniciar coleta'}).click();
  await page.evaluate(()=>{

@@ -23,3 +23,9 @@ Para reproduzir o build e os testes: `npm ci`, `npm run build`, `npx vitest run`
 O mapa define a frente de cada trecho a partir do primeiro deslocamento estimado cuja distância à origem alcança 0,75 m. Essa direção é exibida para cima; a transformação é uma rotação rígida que preserva distâncias e giros à direita e à esquerda. Antes disso, a linha fica oculta e a interface solicita uma caminhada inicial reta. O trecho inicial de aproximadamente 2,5 s continua sem estimativa pelo modelo. A orientação depende da previsão, portanto ruído, desvios ou movimento insuficiente podem atrasar ou desalinhar a calibração; não é uma medição direta da orientação do usuário. A mesma direção inicial é mantida após pausas e lacunas; movimentos durante elas não são observados.
 
 Botões, roda do mouse e pinça alteram a escala visual; uma quadrícula continua representando 1 m × 1 m em qualquer zoom. O reset restaura o zoom e a centralização.
+
+## Verificação inicial de compatibilidade
+
+Antes de iniciar, o usuário autoriza os sensores e movimenta o aparelho durante cinco segundos. A verificação exige leituras completas de acelerômetro com gravidade, giroscópio e orientação, além de pelo menos 50 Hz de eventos completos de movimento durante o intervalo. Sensores ausentes, permissão negada ou frequência insuficiente são informados, com opção de repetir o teste. Uma aprovação indica disponibilidade durante aquela amostra, não garante precisão ou disponibilidade contínua.
+
+Depois que o usuário toca em Iniciar, a página mostra o carregamento real do modelo e só abre o mapa quando o carregamento e o teste de compatibilidade do modelo terminam. Em caso de erro, é possível tentar novamente. A aquisição de rastreamento começa apenas ao tocar em play na tela do mapa.
