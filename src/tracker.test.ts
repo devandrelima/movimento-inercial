@@ -1,12 +1,14 @@
 import {expect,it} from 'vitest'
 import {Tracker,type Segment} from './tracker'
 const flush=()=>new Promise(resolve=>setTimeout(resolve,0))
-it('acumula deltas e inicia novo trecho após pausa',async()=>{
+it('acumula deltas no mesmo traço após pausa e falha de coleta',async()=>{
  let segments:Segment[]=[];const tracker=new Tracker(async()=>[1,2],value=>{segments=value},()=>{})
  tracker.start();tracker.enqueue(new Float32Array(600));tracker.enqueue(new Float32Array(600));await flush()
  expect(segments[0].points).toEqual([{x:0,y:0},{x:1,y:2},{x:2,y:4}])
  tracker.pause();tracker.start();tracker.enqueue(new Float32Array(600));await flush()
- expect(segments).toHaveLength(2);expect(segments[1].points).toEqual([{x:0,y:0},{x:1,y:2}]);tracker.clear();expect(segments).toEqual([])
+ expect(segments).toHaveLength(1);expect(segments[0].points).toEqual([{x:0,y:0},{x:1,y:2},{x:2,y:4},{x:3,y:6}])
+ tracker.interrupt();tracker.enqueue(new Float32Array(600));await flush()
+ expect(segments[0].points.at(-1)).toEqual({x:4,y:8});tracker.clear();expect(segments).toEqual([])
 })
 it('descarta resultado atrasado de uma sessão pausada',async()=>{
  let resolve:(value:[number,number])=>void=()=>{};let segments:Segment[]=[]

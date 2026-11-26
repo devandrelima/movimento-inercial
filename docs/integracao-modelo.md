@@ -8,7 +8,7 @@ São necessários aceleração com gravidade, giroscópio e orientação complet
 
 A orientação `deviceorientation` gira os eixos do aparelho para um referencial horizontal local, sem exigir norte magnético. As equivalências entre essa orientação do navegador e `game_rv` do RoNIN, bem como calibrações e sinais de dispositivos diferentes, ainda precisam ser validadas fisicamente. O filtro causal de quatro estágios de 12 Hz precede a interpolação temporal para 50 Hz; o primeiro segundo é descartado. Cada janela tem 100 amostras e avança 25. A normalização está embutida nos pesos. Uma saída `[dx, dy]` representa somente os últimos 0,5 s de cada janela e é somada uma vez. Aproximadamente os primeiros 2,5 s não têm estimativa.
 
-A perda de sensor/orientação, frequência insuficiente, lacuna de amostragem ou pausa interrompe a inferência. Ao retomar, um novo trecho independente começa na origem; a posição durante a interrupção é desconhecida. Assim, trechos separados não podem ser interpretados como coordenadas no mesmo referencial. O mapa assume 1 metro por quadrícula.
+A perda de sensor/orientação, frequência insuficiente, lacuna de amostragem ou pausa interrompe a inferência. Ao retomar, a estimativa continua no último ponto conhecido, usando o referencial inicial enquanto a origem de orientação do navegador permanecer compatível. O deslocamento durante a interrupção é desconhecido e não é acrescentado; se a pessoa se mover durante essa lacuna, a posição exibida ficará deslocada. Se a referência da orientação mudar entre absoluta e relativa, a inferência fica suspensa até voltar à referência original. O mapa assume 1 metro por quadrícula.
 
 ## Validação e limitações
 
@@ -20,6 +20,6 @@ Para reproduzir o build e os testes: `npm ci`, `npm run build`, `npx vitest run`
 
 ## Direção inicial e zoom do mapa
 
-O mapa define a frente de cada trecho a partir do primeiro deslocamento estimado cuja distância à origem alcança 0,75 m. Essa direção é exibida para cima; a transformação é uma rotação rígida que preserva distâncias e giros à direita e à esquerda. Antes disso, a linha fica oculta e a interface solicita uma caminhada inicial reta. O trecho inicial de aproximadamente 2,5 s continua sem estimativa pelo modelo. A orientação depende da previsão, portanto ruído, desvios ou movimento insuficiente podem atrasar ou desalinhar a calibração; não é uma medição direta da orientação do usuário. Após pausa ou lacuna, o trecho independente precisa de nova direção inicial.
+O mapa define a frente de cada trecho a partir do primeiro deslocamento estimado cuja distância à origem alcança 0,75 m. Essa direção é exibida para cima; a transformação é uma rotação rígida que preserva distâncias e giros à direita e à esquerda. Antes disso, a linha fica oculta e a interface solicita uma caminhada inicial reta. O trecho inicial de aproximadamente 2,5 s continua sem estimativa pelo modelo. A orientação depende da previsão, portanto ruído, desvios ou movimento insuficiente podem atrasar ou desalinhar a calibração; não é uma medição direta da orientação do usuário. A mesma direção inicial é mantida após pausas e lacunas; movimentos durante elas não são observados.
 
 Botões, roda do mouse e pinça alteram a escala visual; uma quadrícula continua representando 1 m × 1 m em qualquer zoom. O reset restaura o zoom e a centralização.
