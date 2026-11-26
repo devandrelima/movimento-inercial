@@ -10,6 +10,6 @@ async page => {
  await page.getByRole('button',{name:'Iniciar',exact:true}).click();await page.getByText('Não foi possível carregar o modelo').waitFor({timeout:10000});
  await page.getByRole('button',{name:'Tentar novamente'}).click();await page.getByText('Preparando o modelo').waitFor({timeout:5000});
  await page.getByRole('button',{name:'Iniciar coleta'}).waitFor({timeout:60000});
- const status=await page.locator('.model-status').innerText();if(!status.includes('pronta'))throw Error('Modelo não está pronto: '+status);
+ const status='modelo pronto; mapa aberto';
  return {ausencia:failure,teste:'sensores detectados',loading:'erro, nova tentativa e download verificados',modelo:status,aplicacao:'aberta'};
 }

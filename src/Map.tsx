@@ -91,6 +91,6 @@ export default function Map({ resetKey, segments }: { resetKey: number; segments
     </svg>
     <div className="crosshair"><div className="origin"/><span>Origem</span></div>
     <div className="field-foot"><span>X →</span><span>Y ↑</span></div>
-    <p className="model-note">{awaiting?'Ao iniciar, caminhe em linha reta para definir a frente.':'Estimativa experimental · cerca de 2,5 s iniciais não são estimados.'}</p>
+    {awaiting && <p className="model-note">Ao iniciar, caminhe em linha reta para definir a frente.</p>}
   </section>
 }

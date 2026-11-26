@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { sensorPermissions, readOrientation, readPartialMotion, samplingHz, type OrientationSample, type PartialSample, type PartialVector } from './sensors'
+import { sensorPermissions, readOrientation, readPartialMotion, type OrientationSample, type PartialSample, type PartialVector } from './sensors'
 import { encodeCsv, motionRow, orientationRow, preparedRow, sessionRow, type Row } from './csv'
 import './App.css'
 import { MotionPreprocessor, type PreparedWindow, type PreprocessState } from './preprocess'
@@ -22,7 +22,6 @@ function App({onModelReady,onModelError,onModelProgress}:{onModelReady:()=>void;
   const permissionPending = useRef(false)
   const orientationPermission = useRef<'granted'|'denied'|'unavailable'>('unavailable')
   const runId = useRef(0)
-  const [hz, setHz] = useState<number | null>(null)
   const [status, setStatus] = useState('Pronto para iniciar')
   const [running, setRunning] = useState(false)
   const [requesting, setRequesting] = useState(false)
@@ -31,7 +30,6 @@ function App({onModelReady,onModelError,onModelProgress}:{onModelReady:()=>void;
   const [mapReset, setMapReset] = useState(0)
   const [limitReached, setLimitReached] = useState(false)
   const [preprocessState, setPreprocessState] = useState<PreprocessState>('warming')
-  const [windowCount, setWindowCount] = useState(0)
   const [segments,setSegments] = useState<Segment[]>([])
   const [positionGap,setPositionGap] = useState(false)
   const [modelStatus,setModelStatus] = useState('Carregando IA v2 experimental…')
@@ -92,7 +90,7 @@ function App({onModelReady,onModelError,onModelProgress}:{onModelReady:()=>void;
       } else if (prepared.window && frame.current && modelReady.current) {
         try {
           const input=modelInput(prepared.window.samples,frame.current)
-          if (tracker.current?.enqueue(input)) {latestWindow.current=prepared.window;setWindowCount(value=>value+1)}
+          if (tracker.current?.enqueue(input)) latestWindow.current=prepared.window
         } catch {tracker.current?.interrupt();preprocessor.current.reset();latestWindow.current=null;setPositionGap(true);setModelStatus('IA pausada · orientação incompleta')}
       }
       recent.current.push(current)
@@ -100,7 +98,7 @@ function App({onModelReady,onModelError,onModelProgress}:{onModelReady:()=>void;
       if (now - lastRender.current >= 200) {
         const missingAccel = Object.values(current.acceleration).some(value => value === null)
         const missingGyro = Object.values(current.rotation).some(value => value === null)
-        setSample(current); setCount(records.current.length); setHz(samplingHz(recent.current)); setPreprocessState(prepared.state)
+        setSample(current); setCount(records.current.length); setPreprocessState(prepared.state)
         setStatus(missingAccel && missingGyro ? 'Sensores indisponíveis' : missingGyro ? 'Giroscópio indisponível' : missingAccel ? 'Acelerômetro indisponível' : 'Sensores ativos')
         lastRender.current = now
       }
@@ -128,7 +126,7 @@ function App({onModelReady,onModelError,onModelProgress}:{onModelReady:()=>void;
     const watchdog=window.setInterval(()=>{
       if (active.current && lastMotion.current !== null && performance.now()-lastMotion.current>1000) {
         lastMotion.current=null; preprocessor.current.reset(); tracker.current?.interrupt(); setPositionGap(true); latestWindow.current=null; recent.current=[]; lastRender.current=0; if(modelReady.current)setModelStatus('IA pausada · leituras interrompidas')
-        setHz(null); setPreprocessState('gap'); setStatus('Leituras de movimento interrompidas')
+        setPreprocessState('gap'); setStatus('Leituras de movimento interrompidas')
       }
     },500)
     return () => { active.current = false; window.clearInterval(watchdog); window.removeEventListener('devicemotion', onMotion); window.removeEventListener('deviceorientation', onOrientation) }
@@ -151,13 +149,13 @@ function App({onModelReady,onModelError,onModelProgress}:{onModelReady:()=>void;
     window.setTimeout(() => { if (!active.current || runId.current !== currentRun) return; if (recent.current.length === 0) setStatus('Nenhuma leitura de movimento'); if (orientationPermission.current === 'granted' && orientationLatest.current === null) setOrientationStatus('Nenhuma orientação recebida') }, 5000)
   }
   function reset() {
-    active.current = false; tracker.current?.clear(); frame.current=null; if(modelReady.current)setModelStatus('IA v2 experimental pronta'); lastMotion.current=null; preprocessor.current.reset(); latestWindow.current=null; setPreprocessState('warming'); setWindowCount(0); runId.current++; orientationLatest.current=null; started.current = false; records.current = []; recent.current = []; lastRender.current = 0
-    setMapReset(value=>value+1); setPositionGap(false); setRunning(false); setSample(undefined); setOrientation(undefined); setOrientationStatus('Aguardando início'); setCount(0); setHz(null); setLimitReached(false); setStatus('Pronto para iniciar'); setConfirmReset(false); dialog.current?.close()
+    active.current = false; tracker.current?.clear(); frame.current=null; if(modelReady.current)setModelStatus('IA v2 experimental pronta'); lastMotion.current=null; preprocessor.current.reset(); latestWindow.current=null; setPreprocessState('warming'); runId.current++; orientationLatest.current=null; started.current = false; records.current = []; recent.current = []; lastRender.current = 0
+    setMapReset(value=>value+1); setPositionGap(false); setRunning(false); setSample(undefined); setOrientation(undefined); setOrientationStatus('Aguardando início'); setCount(0); setLimitReached(false); setStatus('Pronto para iniciar'); setConfirmReset(false); dialog.current?.close()
   }
   function download() {
     const url = URL.createObjectURL(new Blob([encodeCsv(records.current)], { type: 'text/csv;charset=utf-8' }))
     const link = document.createElement('a'); link.href = url; link.download = 'sensores.csv'; link.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
-  return <div className="shell"><main><Map resetKey={mapReset} segments={segments}/><section className="instrument" aria-label="Leituras dos sensores"><div className="instrument-head"><h2>Leituras ao vivo</h2><span>{hz === null ? '— Hz' : `${hz.toFixed(1)} Hz`}</span></div><div className="readings"><Readings label="Aceleração com gravidade" unit="m/s²" values={sample?.acceleration}/><Readings label="Giroscópio" unit="rad/s" values={sample?.rotation}/><Readings label="Orientação" unit="graus" labels={['α','β','γ']} values={orientation ? {x:orientation.alpha,y:orientation.beta,z:orientation.gamma} : undefined}/></div><div role="status" aria-live="polite">{['Permissão de orientação negada','Orientação indisponível','Nenhuma orientação recebida','Orientação sem valores','Referência de orientação alterada'].includes(orientationStatus) && <p className="orientation-status">{orientationStatus}</p>}{['Permissão negada','Sensores indisponíveis ou conexão insegura','Sensores indisponíveis','Giroscópio indisponível','Acelerômetro indisponível','Nenhuma leitura de movimento','Leituras de movimento interrompidas','Limite de gravação atingido','Limite atingido. Exporte ou reinicie a coleta.'].includes(status) && <p className="sensor-status">{status}</p>}</div>{running && <p className="processing-status" role="status">{preprocessState === 'ready' ? `50 Hz · ${windowCount} janelas preparadas` : preprocessState === 'low-rate' ? 'Frequência inferior a 50 Hz' : preprocessState === 'gap' ? 'Intervalo interrompido; reiniciando janela' : preprocessState === 'missing' ? 'Dados incompletos para a janela' : 'Preparando entrada a 50 Hz'}</p>}<p className="model-status" role="status">{modelStatus}</p>{positionGap && <p className="hint">Movimentos durante pausas ou falhas não são estimados.</p>}<div className="controls"><button className="reset" onClick={() => setConfirmReset(true)} aria-label="Resetar dados">↺ <span>Resetar</span></button><button className="download" onClick={download} disabled={count === 0}>Baixar CSV</button><button className="play" onClick={toggle} disabled={requesting} aria-label={running ? 'Pausar coleta' : started.current ? 'Retomar coleta' : 'Iniciar coleta'}>{running ? <span aria-hidden="true">Ⅱ</span> : <span aria-hidden="true">▶</span>}</button></div>{limitReached && <p className="hint">Limite de gravação atingido. Baixe o CSV antes de resetar.</p>}</section></main><dialog ref={dialog} onClose={() => setConfirmReset(false)} onCancel={() => setConfirmReset(false)}><h2>Resetar dados?</h2><p>Os dados coletados e a trajetória serão apagados. Esta ação não pode ser desfeita.</p><div className="dialog-actions"><button className="secondary" onClick={() => {dialog.current?.close(); setConfirmReset(false)}}>Cancelar</button><button className="confirm" onClick={reset}>Resetar</button></div></dialog></div>
+  return <div className="shell"><main><Map resetKey={mapReset} segments={segments}/><section className="instrument" aria-label="Leituras dos sensores"><div className="instrument-head"><h2>Leituras ao vivo</h2></div><div className="readings"><Readings label="Aceleração com gravidade" unit="m/s²" values={sample?.acceleration}/><Readings label="Giroscópio" unit="rad/s" values={sample?.rotation}/><Readings label="Orientação" unit="graus" labels={['α','β','γ']} values={orientation ? {x:orientation.alpha,y:orientation.beta,z:orientation.gamma} : undefined}/></div><div role="status" aria-live="polite">{['Permissão de orientação negada','Orientação indisponível','Nenhuma orientação recebida','Orientação sem valores','Referência de orientação alterada'].includes(orientationStatus) && <p className="orientation-status">{orientationStatus}</p>}{['Permissão negada','Sensores indisponíveis ou conexão insegura','Sensores indisponíveis','Giroscópio indisponível','Acelerômetro indisponível','Nenhuma leitura de movimento','Leituras de movimento interrompidas','Limite de gravação atingido','Limite atingido. Exporte ou reinicie a coleta.'].includes(status) && <p className="sensor-status">{status}</p>}</div>{running && ['low-rate','gap','missing'].includes(preprocessState) && <p className="processing-status" role="status">{preprocessState === 'low-rate' ? 'Frequência insuficiente para o modelo' : preprocessState === 'gap' ? 'Leituras interrompidas; aguardando sensores' : 'Dados incompletos dos sensores'}</p>}{(modelStatus.includes('estimando trajetória') || modelStatus.startsWith('IA interrompida') || modelStatus.startsWith('IA pausada') || modelStatus.startsWith('IA indisponível')) && <p className="model-status" role="status">{modelStatus.includes('estimando trajetória') ? 'Estimando trajetória' : modelStatus}</p>}{positionGap && <p className="hint">Movimentos durante pausas ou falhas não são estimados.</p>}<div className="controls"><button className="reset" onClick={() => setConfirmReset(true)} aria-label="Resetar dados">↺ <span>Resetar</span></button><button className="download" onClick={download} disabled={count === 0}>Baixar CSV</button><button className="play" onClick={toggle} disabled={requesting} aria-label={running ? 'Pausar coleta' : started.current ? 'Retomar coleta' : 'Iniciar coleta'}>{running ? <span aria-hidden="true">Ⅱ</span> : <span aria-hidden="true">▶</span>}</button></div>{limitReached && <p className="hint">Limite de gravação atingido. Baixe o CSV antes de resetar.</p>}</section></main><dialog ref={dialog} onClose={() => setConfirmReset(false)} onCancel={() => setConfirmReset(false)}><h2>Resetar dados?</h2><p>Os dados coletados e a trajetória serão apagados. Esta ação não pode ser desfeita.</p><div className="dialog-actions"><button className="secondary" onClick={() => {dialog.current?.close(); setConfirmReset(false)}}>Cancelar</button><button className="confirm" onClick={reset}>Resetar</button></div></dialog></div>
 }
 export default App

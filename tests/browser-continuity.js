@@ -6,7 +6,7 @@ async page => {
  },16)});
  await page.getByRole('button',{name:'Iniciar',exact:true}).waitFor({timeout:9000});
  await page.evaluate(()=>clearInterval(window.checkFeed));await page.getByRole('button',{name:'Iniciar',exact:true}).click();
- await page.waitForFunction(()=>document.querySelector('.model-status')?.textContent?.includes('pronta'),{timeout:60000});
+ await page.getByRole('button',{name:'Iniciar coleta'}).waitFor({timeout:60000});
  await page.getByRole('button',{name:'Iniciar coleta'}).click();
  await page.evaluate(()=>{
   let clock=1000,i=0;Object.defineProperty(performance,'now',{configurable:true,value:()=>clock});
@@ -21,6 +21,8 @@ async page => {
  const line=page.locator('.trajectory-layer polyline');
  if(await line.count()!==1)throw Error('Não há um traço: '+await page.locator('.model-status').innerText());
  const read=async()=>{const scale=await page.locator('.field').evaluate(e=>parseFloat(getComputedStyle(e).backgroundSize));const p=await line.getAttribute('points');return p.split(' ').map(s=>s.split(',').map(Number).map(n=>n/scale))};
+ const status=await page.locator('.model-status').innerText();if(status!=='Estimando trajetória')throw Error('Estado inesperado: '+status);
+ const text=await page.locator('body').innerText();for(const forbidden of ['janelas preparadas','IA v2 experimental','Estimativa experimental',' Hz'])if(text.includes(forbidden))throw Error('Texto indesejado: '+forbidden);
  const before=await read();
  await page.getByRole('button',{name:'Aumentar zoom'}).click();
  const zoomed=await read();if(before.length!==zoomed.length||before.some((p,i)=>p.some((v,j)=>Math.abs(v-zoomed[i][j])>1e-6)))throw Error('Zoom mudou a trajetória');

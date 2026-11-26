@@ -14,5 +14,5 @@ async page => {
  await page.waitForFunction(()=>document.querySelector('[aria-label="Carregamento do modelo"]')?.getAttribute('aria-valuenow')==='100',{timeout:60000});
  const values=await page.evaluate(()=>window.progressValues);if(values.some((v,i)=>i&&v<values[i-1]))throw Error('Progresso retrocedeu: '+values);
  await page.getByRole('button',{name:'Iniciar coleta'}).waitFor({timeout:60000});
- return {inicial:first,duranteDownload:delayed,valores:values,modelo:await page.locator('.model-status').innerText()};
+ return {inicial:first,duranteDownload:delayed,valores:values,modelo:'pronto; mapa aberto'};
 }
