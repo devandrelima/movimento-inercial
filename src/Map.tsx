@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
+import type {Segment} from './tracker'
 
 type Offset = { x: number; y: number }
 type Drag = { id: number; x: number; y: number; origin: Offset }
 
-export default function Map({ resetKey }: { resetKey: number }) {
+export default function Map({ resetKey, segments }: { resetKey: number; segments: Segment[] }) {
   const map = useRef<HTMLElement>(null)
   const offset = useRef<Offset>({ x: 0, y: 0 })
   const drag = useRef<Drag | null>(null)
@@ -39,8 +40,17 @@ export default function Map({ resetKey }: { resetKey: number }) {
   return <section ref={map} className="field" role="region" tabIndex={0} aria-label="Plano de trajetória. Arraste para navegar ou use as setas do teclado." onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end} onKeyDown={keyboard}>
     <div className="field-top"><span>Plano de trajetória</span><span>Grade: 1 m × 1 m</span></div>
     {panned && <button className="center-map" onPointerDown={event => event.stopPropagation()} onClick={() => moveTo({x:0,y:0})}>Centralizar</button>}
+    <svg className="trajectory-layer" width="1" height="1" role="img" aria-label="Trajetória estimada">
+      {segments.map((segment,index)=>{
+        const last=segment.points[segment.points.length-1]
+        return <g key={segment.id} opacity={index===segments.length-1 ? 1 : 0.35}>
+          <polyline points={segment.points.map(point=>`${point.x*48},${-point.y*48}`).join(' ')} fill="none" stroke="#087a80" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+          {segment.points.length>1 && <circle cx={last.x*48} cy={-last.y*48} r="5" fill="#087a80" stroke="white" strokeWidth="2"/>}
+        </g>
+      })}
+    </svg>
     <div className="crosshair"><div className="origin"/><span>Origem</span></div>
     <div className="field-foot"><span>X →</span><span>Y ↑</span></div>
-    <p className="model-note">Trajetória disponível após validação do modelo.</p>
+    <p className="model-note">Estimativa experimental · cerca de 2,5 s iniciais não são estimados.</p>
   </section>
 }

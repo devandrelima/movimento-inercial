@@ -28,3 +28,5 @@ dist-ssr
 
 # Dados RoNIN são mantidos fora do repositório e das imagens
 data/
+
+artifacts/

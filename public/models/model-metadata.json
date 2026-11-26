@@ -1,0 +1,170 @@
+{
+  "nome": "ronin_cnn_local_experimental",
+  "versao": "1.0-experimental",
+  "data": "2026-11-25T23:05:29-03:00",
+  "architecture": {
+    "name": "cnn",
+    "epochs": 15,
+    "best_epoch": 15,
+    "best_val_mse_m2": 0.016975268721580505,
+    "val_mae_m": 0.08990907669067383,
+    "train_mse_at_best": 0.012553079053759575,
+    "params": 5738,
+    "keras_bytes": 104428,
+    "training_seconds": 33.18777204199432
+  },
+  "arquivos": {
+    "modelo.keras": {
+      "bytes": 104236,
+      "sha256": "6336a6e2ec30c36741b89819072c5739450f8546173df0a744732885df4b0227"
+    },
+    "modelo_float.tflite": {
+      "bytes": 26480,
+      "sha256": "de6c0c5cad257db988c14d39b30d8aac39758f092429c8328faab88cb958e438",
+      "input": {
+        "name": "imu",
+        "shape": [
+          1,
+          100,
+          6
+        ],
+        "dtype": "float32",
+        "scale": 0.0,
+        "zero_point": 0
+      },
+      "output": {
+        "name": "Identity",
+        "shape": [
+          1,
+          2
+        ],
+        "dtype": "float32",
+        "scale": 0.0,
+        "zero_point": 0
+      },
+      "ops": [
+        "SUB",
+        "MUL",
+        "RESHAPE",
+        "CONV_2D",
+        "CONV_2D",
+        "RESHAPE",
+        "MEAN",
+        "FULLY_CONNECTED",
+        "FULLY_CONNECTED"
+      ]
+    },
+    "modelo_int8.tflite": {
+      "bytes": 11608,
+      "sha256": "a2cc4d25c071b69704b321ea4d1c0e1d92d9c35f5a2584c190277f8139bc908c",
+      "input": {
+        "name": "imu",
+        "shape": [
+          1,
+          100,
+          6
+        ],
+        "dtype": "int8",
+        "scale": 0.16248543560504913,
+        "zero_point": -40
+      },
+      "output": {
+        "name": "Identity",
+        "shape": [
+          1,
+          2
+        ],
+        "dtype": "int8",
+        "scale": 0.006060994695872068,
+        "zero_point": 6
+      },
+      "ops": [
+        "SUB",
+        "MUL",
+        "RESHAPE",
+        "CONV_2D",
+        "CONV_2D",
+        "RESHAPE",
+        "MEAN",
+        "FULLY_CONNECTED",
+        "FULLY_CONNECTED"
+      ]
+    }
+  },
+  "preprocessamento": {
+    "raw_contract": "[1,100,6] float32: acel XYZ m/s², gyro XYZ rad/s; ambos girados do aparelho para referencial local",
+    "sample_rate_hz": 50,
+    "window_samples": 100,
+    "stride_samples": 25,
+    "filter": "4 estágios causais a 12 Hz, inicializados na primeira amostra; interpolação temporal",
+    "warmup_s": 1,
+    "max_gap_s": 0.075,
+    "simulation": "anti-alias 200->60 Hz por resample_poly 3/10; eventos a 60 Hz sem jitter; orientação anterior a cada amostra da grade",
+    "normalization": "incorporada no modelo, estatísticas apenas do treino",
+    "norm": {
+      "mean": [
+        0.00043796763110507216,
+        0.0041544367171601065,
+        9.811956489178437,
+        0.001330500678784028,
+        0.0022483743382832283,
+        -0.0015728965776948373
+      ],
+      "std": [
+        1.723065872647419,
+        1.726090486350098,
+        2.029617993827304,
+        0.784398270373301,
+        0.7903194254883176,
+        0.9102841363838142
+      ],
+      "source": "train only",
+      "epsilon_variance": 1e-08
+    },
+    "orientation": "Rz(alpha) Rx(beta) Ry(gamma); yaw inicial subtraído. Obrigatória orientação relativa completa, max 500 ms; equivalência game_rv/navegador pendente"
+  },
+  "saida": {
+    "shape": [
+      1,
+      2
+    ],
+    "unidades": "m",
+    "intervalo": "deslocamento nos últimos 25 intervalos da janela, 0,5 s",
+    "acumulo": "somar uma previsão por avanço de 25 amostras; não somar janelas inteiras",
+    "inicio": "primeira saída ~3 s após início; trecho anterior não é previsto"
+  },
+  "versoes": {
+    "tensorflow": "2.16.2",
+    "python": "3.12.14"
+  },
+  "splits": {
+    "treino_janelas": 85110,
+    "validacao_janelas": 17281,
+    "teste_nao_visto_janelas": 38329,
+    "treino_ausente": [
+      "a007_3"
+    ]
+  },
+  "test_metrics": {
+    "keras": {
+      "mae_m": 0.10819032788276672,
+      "mse_m2": 0.02568713016808033,
+      "rmse_m": 0.1602720469236374
+    },
+    "int8": {
+      "mae_m": 0.11202069371938705,
+      "mse_m2": 0.026061462238430977,
+      "rmse_m": 0.16143563389778137
+    }
+  },
+  "browser_compatibility": "validado",
+  "limites": [
+    "orientação e sensores reais no navegador não validados",
+    "modelo não pronto para integração operacional",
+    "tempo e RAM no smartphone não mensurados",
+    "treino usa calibração RoNIN; equivalência com sinais do browser não demonstrada",
+    "deriva acumulada expressiva",
+    "uma sequência da lista de treino está ausente"
+  ],
+  "browser_scope": "Arc 1.173.1 desktop headless, LiteRT.js 2.6.0/Wasm, um vetor sintético; smartphone, frontend e sensores pendentes"
+}
