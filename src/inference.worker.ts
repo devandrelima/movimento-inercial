@@ -1,8 +1,8 @@
 import { Tensor, loadAndCompile, loadLiteRt, type CompiledModel } from '@litertjs/core'
-import fixture from './fixtures/model-reference.json'
+import fixture from './fixtures/model-v2-reference.json'
 
 const ctx = self as unknown as {onmessage: ((event: MessageEvent) => void) | null; postMessage: (message: unknown) => void}
-const MODEL_HASH='de6c0c5cad257db988c14d39b30d8aac39758f092429c8328faab88cb958e438'
+const MODEL_HASH='91756152ee1babada0ea8837c0116f580c4481632f70944b982a566becf04ea1'
 let model: CompiledModel | null = null
 async function predict(values:Float32Array):Promise<number[]> {
   if (!model || values.length!==600 || !values.every(Number.isFinite)) throw new Error('Entrada inválida para o modelo')
@@ -20,14 +20,14 @@ ctx.onmessage=async event=>{
   try {
     if (type==='init') {
       await loadLiteRt('/wasm/')
-      const response=await fetch('/models/ronin-float.tflite',{cache:'no-cache'})
+      const response=await fetch('/models/ronin-v2-float.tflite',{cache:'no-cache'})
       if (!response.ok) throw new Error(`Modelo indisponível (HTTP ${response.status})`)
       const buffer=await response.arrayBuffer(),bytes=new Uint8Array(buffer)
       const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',buffer))).map(x=>x.toString(16).padStart(2,'0')).join('')
       if (hash!==MODEL_HASH) throw new Error('Verificação do modelo falhou')
       model=await loadAndCompile(bytes,{accelerator:'wasm'})
-      const actual=await predict(new Float32Array(fixture.input.flat(2)))
-      const expected=fixture.tflite_float[0]
+      const actual=await predict(new Float32Array(fixture.x.flat(2)))
+      const expected=fixture.float[0]
       if (actual.some((value,index)=>Math.abs(value-expected[index])>1e-5)) throw new Error('Teste de compatibilidade do modelo falhou')
       ctx.postMessage({id,ok:true})
     } else if (type==='predict' && values) {

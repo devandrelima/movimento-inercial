@@ -33,7 +33,7 @@ function App() {
   const [preprocessState, setPreprocessState] = useState<PreprocessState>('warming')
   const [windowCount, setWindowCount] = useState(0)
   const [segments,setSegments] = useState<Segment[]>([])
-  const [modelStatus,setModelStatus] = useState('Carregando IA experimental…')
+  const [modelStatus,setModelStatus] = useState('Carregando IA v2 experimental…')
   const modelReady = useRef(false)
   const model = useRef<ModelClient | null>(null)
   const frame = useRef<LocalFrame | null>(null)
@@ -49,7 +49,7 @@ function App() {
   const tracker = useRef<Tracker | null>(null)
   if (!tracker.current) tracker.current=new Tracker(
     async input=>{if (!model.current || !modelReady.current) throw new Error('IA indisponível');return model.current.predict(input)},
-    value=>{setSegments(value);setModelStatus('IA experimental · estimando trajetória')},
+    value=>{setSegments(value);setModelStatus('IA v2 experimental · estimando trajetória')},
     message=>{frame.current=null;preprocessor.current.reset();latestWindow.current=null;setModelStatus(`IA interrompida: ${message}`)},
   )
   useEffect(()=>{
@@ -60,7 +60,7 @@ function App() {
     client.initialize().then(()=>{
       if (!mounted) return
       modelReady.current=true
-      setModelStatus(active.current ? 'IA experimental · aguardando orientação' : 'IA experimental pronta')
+      setModelStatus(active.current ? 'IA v2 experimental · aguardando orientação' : 'IA v2 experimental pronta')
     }).catch(error=>{if (mounted) {modelReady.current=false;setModelStatus(`IA indisponível: ${error instanceof Error ? error.message : 'falha ao carregar'}`)}})
     return ()=>{mounted=false;modelReady.current=false;tracker.current?.pause();client.dispose();if (model.current===client)model.current=null}
   },[])
@@ -112,7 +112,7 @@ function App() {
       if ([current.alpha,current.beta,current.gamma].every(value=>value!==null)) {
         if (frame.current && frame.current.absolute!==current.absolute) {frame.current=null;tracker.current?.interrupt();preprocessor.current.reset();latestWindow.current=null}
         if (!frame.current) {
-          try {frame.current=initializeFrame(current);preprocessor.current.reset();if(modelReady.current)setModelStatus('IA experimental · preparando trajetória')}
+          try {frame.current=initializeFrame(current);preprocessor.current.reset();if(modelReady.current)setModelStatus('IA v2 experimental · preparando trajetória')}
           catch {setModelStatus('IA pausada · ajuste a orientação do aparelho')}
         }
       }
@@ -133,7 +133,7 @@ function App() {
   }, [])
   useEffect(() => { if (confirmReset && dialog.current && !dialog.current.open) dialog.current.showModal() }, [confirmReset])
   async function toggle() {
-    if (active.current) { active.current = false; tracker.current?.pause(); frame.current=null; if(modelReady.current)setModelStatus('IA experimental · pausada'); lastMotion.current=null; preprocessor.current.reset(); latestWindow.current=null; setPreprocessState('warming'); runId.current++; if (records.current.length < LIMIT) records.current.push(sessionRow('pausa',performance.now(),Date.now())); setRunning(false); setCount(records.current.length); setStatus('Pausado'); setOrientationStatus('Pausado'); return }
+    if (active.current) { active.current = false; tracker.current?.pause(); frame.current=null; if(modelReady.current)setModelStatus('IA v2 experimental · pausada'); lastMotion.current=null; preprocessor.current.reset(); latestWindow.current=null; setPreprocessState('warming'); runId.current++; if (records.current.length < LIMIT) records.current.push(sessionRow('pausa',performance.now(),Date.now())); setRunning(false); setCount(records.current.length); setStatus('Pausado'); setOrientationStatus('Pausado'); return }
     if (limitReached) { setStatus('Limite atingido. Exporte ou reinicie a coleta.'); return }
     if (permissionPending.current) return
     permissionPending.current=true; setRequesting(true); const token=++runId.current
@@ -144,12 +144,12 @@ function App() {
     orientationPermission.current=permission.orientation; orientationLatest.current=null; orientationRendered.current=0; setOrientation(undefined)
     setOrientationStatus(permission.orientation === 'denied' ? 'Permissão de orientação negada' : permission.orientation === 'unavailable' ? 'Orientação indisponível' : 'Aguardando orientação')
     records.current.push(sessionRow('inicio',performance.now(),Date.now())); const currentRun = token
-    tracker.current?.start(); frame.current=null; if(modelReady.current)setModelStatus('IA experimental · aguardando orientação')
+    tracker.current?.start(); frame.current=null; if(modelReady.current)setModelStatus('IA v2 experimental · aguardando orientação')
     preprocessor.current.reset(); lastMotion.current=null; latestWindow.current=null; setPreprocessState('warming'); recent.current = []; lastRender.current = 0; active.current = true; setRunning(true); started.current = true; setStatus('Aguardando sensores')
     window.setTimeout(() => { if (!active.current || runId.current !== currentRun) return; if (recent.current.length === 0) setStatus('Nenhuma leitura de movimento'); if (orientationPermission.current === 'granted' && orientationLatest.current === null) setOrientationStatus('Nenhuma orientação recebida') }, 5000)
   }
   function reset() {
-    active.current = false; tracker.current?.clear(); frame.current=null; if(modelReady.current)setModelStatus('IA experimental pronta'); lastMotion.current=null; preprocessor.current.reset(); latestWindow.current=null; setPreprocessState('warming'); setWindowCount(0); runId.current++; orientationLatest.current=null; started.current = false; records.current = []; recent.current = []; lastRender.current = 0
+    active.current = false; tracker.current?.clear(); frame.current=null; if(modelReady.current)setModelStatus('IA v2 experimental pronta'); lastMotion.current=null; preprocessor.current.reset(); latestWindow.current=null; setPreprocessState('warming'); setWindowCount(0); runId.current++; orientationLatest.current=null; started.current = false; records.current = []; recent.current = []; lastRender.current = 0
     setMapReset(value=>value+1); setRunning(false); setSample(undefined); setOrientation(undefined); setOrientationStatus('Aguardando início'); setCount(0); setHz(null); setLimitReached(false); setStatus('Pronto para iniciar'); setConfirmReset(false); dialog.current?.close()
   }
   function download() {
