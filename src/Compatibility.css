@@ -16,3 +16,19 @@
 @media(prefers-reduced-motion:reduce){.phone-art.is-moving .phone-art-device,.loading-symbol span{animation:none}.compat-progress div{transition:none}}
 .model-loading-progress{width:min(100%,360px);margin-top:32px;text-align:left}.model-loading-label{display:flex;justify-content:space-between;align-items:baseline;color:#668087;font-size:13px;font-weight:600}.model-loading-label strong{font:700 18px Manrope,sans-serif;font-variant-numeric:tabular-nums;color:#176b6e}.model-loading-track{height:8px;margin-top:11px;overflow:hidden;border-radius:8px;background:#deebe9}.model-loading-track div{height:100%;background:#176b6e;border-radius:inherit;transition:width .16s ease}
 @media(prefers-reduced-motion:reduce){.model-loading-track div{transition:none}}
+/* Scale the introduction to the browser's visible height on phones. */
+@media(max-width:700px){
+  .compat-page{padding:16px 24px}.compat-container{min-height:calc(100dvh - 32px)}
+  .compat-content{gap:clamp(8px,2dvh,22px);padding:12px 0;align-content:center}
+  .phone-art img{width:min(56vw,30dvh,230px)}
+  .compat-copy h1{font-size:clamp(25px,7vw,34px);margin-top:0}
+  .compat-description{font-size:14px;line-height:1.5;margin-top:10px}
+  .compat-primary{min-height:48px;margin-top:18px}.compat-progress{margin-top:14px}.compat-timer{font-size:28px;margin-top:8px}.compat-result,.compat-error{margin-top:14px}
+}
+@media(orientation:landscape) and (max-height:600px){
+  .compat-page{padding:12px 24px;place-items:center}.compat-container{min-height:calc(100dvh - 24px)}
+  .compat-content{grid-template-columns:minmax(120px,.65fr) minmax(0,1fr);gap:20px;padding:0;align-content:center}
+  .phone-art img{width:min(35vw,55dvh,220px)}.compat-copy h1{font-size:clamp(23px,4vw,34px);margin-top:0}.compat-description{font-size:14px;line-height:1.4;margin-top:8px}
+  .compat-primary{margin-top:14px;min-height:46px}.compat-progress{margin-top:12px}.compat-timer{font-size:25px;margin-top:5px}.compat-result,.compat-error{margin-top:10px}
+  .loading-content h1{font-size:28px}.loading-symbol{width:58px;height:58px}.model-loading-progress{margin-top:15px}
+}

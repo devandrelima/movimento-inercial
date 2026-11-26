@@ -45,3 +45,31 @@
 .map-zoom{position:absolute;right:18px;top:88px;display:flex;flex-direction:column;background:#fff;border:1px solid #dce7e9;border-radius:5px;overflow:hidden;z-index:1;box-shadow:0 2px 8px #16383b14}
 .map-zoom button{width:42px;height:42px;padding:0;background:#fff;color:#23666c;font-size:24px;line-height:1;border-radius:0;touch-action:manipulation}
 .map-zoom button+button{border-top:1px solid #e5eeed}.map-zoom button:disabled{opacity:.35}.map-zoom button:focus-visible{outline:2px solid #d59c30;outline-offset:-3px}
+/* Keep the complete instrument within the visible mobile viewport. */
+@media(max-width:767px){
+  .shell{max-width:none;height:100vh;height:100dvh;min-height:0;display:flex;flex-direction:column}
+  .shell>main{height:100%;min-height:0;display:flex;flex-direction:column;padding:8px;gap:0}
+  .shell .field{height:auto;min-height:140px;flex:1 1 0}
+  .shell .instrument{flex:0 0 auto;min-width:0;padding:10px 14px 12px;display:flex;flex-direction:column}
+  .shell .instrument-head h2{font-size:17px;line-height:1.2}
+  .shell .readings{display:grid;grid-template-columns:1fr;gap:0;margin-top:4px}
+  .shell .reading{display:grid;grid-template-columns:minmax(100px,1.05fr) minmax(0,1.8fr);align-items:center;gap:8px;padding:6px 0}
+  .shell .reading-title{display:block;min-width:0}.shell .reading h2{font-size:12px;line-height:1.2}.shell .reading-title span{font-size:10px;line-height:1.2}
+  .shell .axes{margin-top:0}.shell .axes small{font-size:10px;line-height:1.1}.shell .axes strong{font-size:16px;line-height:1.15;margin-top:2px}
+  .shell .sensor-status,.shell .orientation-status,.shell .processing-status,.shell .model-status,.shell .hint{font-size:11px;line-height:1.25;margin-top:5px}
+  .shell .controls{margin-top:8px;padding-top:0;gap:6px}.shell .play{width:48px;height:48px;flex:0 0 48px;font-size:19px}
+  .shell .reset,.shell .download{min-height:44px;padding:8px 10px}.shell .reset span,.shell .download{font-size:12px}
+  .shell .field-top,.shell .field-foot{left:12px;right:12px;font-size:11px}.shell .field-top{top:10px}.shell .field-foot{bottom:10px}
+  .shell .model-note{bottom:27px;font-size:11px}.shell .map-zoom{top:36px;right:10px}.shell .center-map{top:36px;right:60px}
+  .shell .map-zoom button{width:42px;height:42px}
+}
+@media(orientation:landscape) and (max-height:600px){
+  .shell{max-width:none;height:100vh;height:100dvh;min-height:0;display:flex;flex-direction:column}
+  .shell>main{height:100%;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,42%);padding:6px}
+  .shell .field{min-height:0;height:100%}.shell .instrument{min-height:0;padding:8px 12px;display:flex;flex-direction:column;border-top:1px solid #dce7e9;border-left:0}
+  .shell .instrument-head h2{font-size:16px;line-height:1.1}.shell .readings{display:grid;grid-template-columns:1fr;gap:0;margin-top:2px}
+  .shell .reading{display:grid;grid-template-columns:minmax(100px,1.05fr) minmax(0,1.8fr);align-items:center;gap:6px;padding:4px 0}
+  .shell .reading-title{display:block}.shell .reading h2{font-size:11px;line-height:1.15}.shell .reading-title span{font-size:10px}.shell .axes{margin:0}.shell .axes small{font-size:9px;line-height:1.1}.shell .axes strong{font-size:14px;line-height:1.1;margin-top:1px}
+  .shell .sensor-status,.shell .orientation-status,.shell .processing-status,.shell .model-status,.shell .hint{font-size:10px;line-height:1.2;margin-top:3px}
+  .shell .controls{margin-top:auto;padding-top:5px;gap:4px}.shell .play{width:44px;height:44px;flex:0 0 44px;font-size:18px}.shell .reset,.shell .download{min-height:44px;padding:6px 8px}.shell .reset span,.shell .download{font-size:11px}
+}
