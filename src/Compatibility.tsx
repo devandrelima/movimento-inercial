@@ -51,11 +51,12 @@ export default function Compatibility({onStart}:{onStart:()=>void}) {
   </div>
  </div></main>
 }
-export function ModelLoading({error,onRetry}:{error:string|null;onRetry:()=>void}) {
+export function ModelLoading({error,progress,onRetry}:{error:string|null;progress:number;onRetry:()=>void}) {
  return <main className="compat-page"><div className="loading-content" role="status" aria-live="polite">
   <div className={error?'loading-symbol error':'loading-symbol'} aria-hidden="true">{error?'!':<span/>}</div>
   <h1>{error?'Não foi possível carregar o modelo':'Preparando o modelo'}</h1>
-  <p className="compat-description">{error||'Aguarde enquanto a inteligência é carregada no seu dispositivo.'}</p>
+  <p className="compat-description">{error||'Aguarde enquanto o modelo é carregado no seu dispositivo.'}</p>
+  {!error && <div className="model-loading-progress"><div className="model-loading-label"><span>Carregando</span><strong>{progress}%</strong></div><div className="model-loading-track" role="progressbar" aria-label="Carregamento do modelo" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}><div style={{width:`${progress}%`}}/></div></div>}
   {error&&<button className="compat-primary" onClick={onRetry}>Tentar novamente <span aria-hidden="true">→</span></button>}
  </div></main>
 }

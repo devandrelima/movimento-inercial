@@ -13,7 +13,7 @@ function Readings({ label, unit, values, labels = ['X','Y','Z'] }: { label: stri
   return <section className="reading"><div className="reading-title"><h2>{label}</h2><span>{unit}</span></div><div className="axes">{(['x', 'y', 'z'] as const).map((axis, index) => <div key={axis}><small>{labels[index]}</small><strong>{format(values?.[axis])}</strong></div>)}</div></section>
 }
 const LIMIT = 36000
-function App({onModelReady,onModelError}:{onModelReady:()=>void;onModelError:(message:string)=>void}) {
+function App({onModelReady,onModelError,onModelProgress}:{onModelReady:()=>void;onModelError:(message:string)=>void;onModelProgress:(value:number)=>void}) {
   const [sample, setSample] = useState<PartialSample>()
   const [orientation, setOrientation] = useState<OrientationSample>()
   const [orientationStatus, setOrientationStatus] = useState('Aguardando início')
@@ -58,14 +58,14 @@ function App({onModelReady,onModelError}:{onModelReady:()=>void;onModelError:(me
     let client:ModelClient
     try {client=new ModelClient();model.current=client}
     catch {setModelStatus('IA indisponível neste navegador');onModelError('Seu navegador não conseguiu iniciar o processamento do modelo.');return}
-    client.initialize().then(()=>{
+    client.initialize(value=>{if(mounted)onModelProgress(value)}).then(()=>{
       if (!mounted) return
       modelReady.current=true
       setModelStatus(active.current ? 'IA v2 experimental · aguardando orientação' : 'IA v2 experimental pronta')
       onModelReady()
     }).catch(error=>{if (mounted) {modelReady.current=false;const message=error instanceof Error ? error.message : 'Falha ao carregar o modelo';setModelStatus(`IA indisponível: ${message}`);onModelError(message)}})
     return ()=>{mounted=false;modelReady.current=false;tracker.current?.pause();client.dispose();if (model.current===client)model.current=null}
-  },[onModelReady,onModelError])
+  },[onModelReady,onModelError,onModelProgress])
   useEffect(() => {
     const onMotion = (event: DeviceMotionEvent) => {
       if (!active.current) return
