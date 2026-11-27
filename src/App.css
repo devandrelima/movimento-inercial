@@ -78,3 +78,5 @@
 @media(max-width:767px){.room-map-actions{left:10px;top:36px;gap:4px;max-width:calc(100% - 75px)}.room-map-actions button{min-height:38px;padding:0 8px;font-size:11px}}
 
 .play[aria-disabled=true],.reset[aria-disabled=true]{opacity:.42;cursor:not-allowed;filter:grayscale(.4)}.limited-notice{color:#9b4b3f}
+
+.route-settings{border-bottom:1px solid #e6eeee;padding-bottom:20px;margin-bottom:20px}.route-settings summary{font-size:14px;font-weight:700;color:#23666c;cursor:pointer}.route-settings p{font-size:12px;line-height:1.5;color:#526f73;margin-top:8px}.route-controls{display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin-top:10px}.route-controls label{display:grid;gap:4px;font-size:12px;color:#526f73}.route-controls input{width:78px;padding:8px;border:1px solid #b7cbca;border-radius:4px;font:inherit}.route-controls button{min-height:36px;border-radius:4px;padding:0 10px;background:#eaf1f1;color:#23666c}.route-controls button:disabled,.route-controls input:disabled{opacity:.55}

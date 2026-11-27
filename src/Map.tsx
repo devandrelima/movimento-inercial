@@ -9,7 +9,7 @@ type Gesture = {scale:number;offset:Point;center:Point;distance:number}
 const MIN_SCALE=12,MAX_SCALE=192,INITIAL_SCALE=48
 const clamp=(value:number)=>Math.max(MIN_SCALE,Math.min(MAX_SCALE,value))
 
-export default function Map({ resetKey, segments, room, matched, onEditRoom, onOpenMaps, locked, limited=false }: { resetKey:number;segments:Segment[];room:Room|null;matched:MatchedPath|null;onEditRoom:()=>void;onOpenMaps:()=>void;locked:boolean;limited?:boolean }) {
+export default function Map({ resetKey, segments, room, matched, goal, route, onEditRoom, onOpenMaps, locked, limited=false }: { resetKey:number;segments:Segment[];room:Room|null;matched:MatchedPath|null;goal:Point|null;route:Point[]|null;onEditRoom:()=>void;onOpenMaps:()=>void;locked:boolean;limited?:boolean }) {
   const map = useRef<HTMLElement>(null)
   const offset = useRef<Point>({x:0,y:0})
   const scale = useRef(INITIAL_SCALE)
@@ -94,6 +94,8 @@ export default function Map({ resetKey, segments, room, matched, onEditRoom, onO
     <svg className="trajectory-layer" width="1" height="1" role="img" aria-label="Trajetória estimada">
       <defs><marker id="room-direction-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="#568b83"/></marker></defs>
       {room && <g aria-label="Sala e obstáculos"><rect x={-room.start.x*pixelsPerMeter} y={(room.start.y-room.height)*pixelsPerMeter} width={room.width*pixelsPerMeter} height={room.height*pixelsPerMeter} fill="#eef7f4" fillOpacity=".5" stroke="#608f89" strokeWidth="2"/>{room.obstacles.map(o=><rect key={o.id} x={(o.x-room.start.x)*pixelsPerMeter} y={(room.start.y-o.y-o.height)*pixelsPerMeter} width={o.width*pixelsPerMeter} height={o.height*pixelsPerMeter} fill="#a9c9c5" stroke="#638c87" strokeWidth="1.5"/>)}</g>}
+      {room && route && <polyline aria-label="Rota sugerida" points={route.map(p=>`${(p.x-room.start.x)*pixelsPerMeter},${(room.start.y-p.y)*pixelsPerMeter}`).join(' ')} fill="none" stroke="#9b6921" strokeWidth="2.5" strokeDasharray="7 5"/>}
+      {room && goal && <circle aria-label="Destino" cx={(goal.x-room.start.x)*pixelsPerMeter} cy={(room.start.y-goal.y)*pixelsPerMeter} r="6" fill="#9b6921" stroke="white" strokeWidth="2"/>}
       {room && <line x1="0" y1="0" x2={roomVector({x:0,y:1},room.heading).x*30} y2={-roomVector({x:0,y:1},room.heading).y*30} stroke="#568b83" strokeWidth="2" markerEnd="url(#room-direction-arrow)"/>}
       {aligned.map((segment,index)=>{
         if(!segment.points)return null
