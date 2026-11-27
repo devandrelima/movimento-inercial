@@ -54,11 +54,10 @@ async page => {
  const scale=await page.locator('.field').evaluate(e=>parseFloat(getComputedStyle(e).backgroundSize));
  const points=corrected.split(' ').map(v=>{const [x,y]=v.split(',').map(Number);return{x:x/scale+1,y:1-y/scale}});
  for(const p of points)if(p.x<0||p.x>10||p.y<0||p.y>8||(p.x>=4&&p.x<=6&&p.y>=3&&p.y<=5))throw Error('Ponto corrigido fora da área livre: '+JSON.stringify(p));
- await page.getByRole('button',{name:'Ver trajetória original'}).click();const original=await line.getAttribute('points');if(!original||original===corrected)throw Error('Comparação indisponível');
- await page.getByRole('button',{name:'Ver trajetória com mapa'}).click();if(await line.getAttribute('points')!==corrected)throw Error('Não retornou à trajetória com mapa');
+ if(await page.getByRole('button',{name:'Centralizar'}).count()||await page.getByRole('button',{name:/Ver (trajetória|original|com mapa)/}).count())throw Error('Botões Centralizar e Ver original/Ver com mapa deveriam ter sido removidos');
  await page.getByText('Sem caminho compatível com a sala.',{exact:false}).waitFor();
  for(const size of [{width:320,height:568},{width:568,height:320}]){await page.setViewportSize(size);const issue=await page.evaluate(()=>{const r=document.querySelector('.play').getBoundingClientRect();return document.documentElement.scrollHeight>innerHeight+1||r.bottom>innerHeight+1});if(issue)throw Error('Aviso ou botão fora da tela: '+JSON.stringify(size))}
  const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Baixar trajetórias em CSV'}).click();const download=await downloadPromise;if(download.suggestedFilename()!=='trajetorias.csv')throw Error('Exportação incorreta');const stream=await download.createReadStream();let csv='';for await(const chunk of stream)csv+=chunk.toString();if(!csv.includes('x_original_m')||!csv.includes('x_mapa_m')||!csv.split('\n').some(row=>row.endsWith(',,')))throw Error('CSV não preserva originais e falhas');
  await page.getByRole('button',{name:'Editar sala'}).click();await page.getByText('Para editar a sala, primeiro reinicie a sessão.').waitFor();
- return {sala:saved.width+' x '+saved.height,obstaculos:saved.obstacles.length,pontosCorrigidos:points.length,comparacao:'ok',csv:download.suggestedFilename(),validacao:'origem em obstáculo rejeitada',persistencia:'após recarga',mobile:'ok'};
+ return {sala:saved.width+' x '+saved.height,obstaculos:saved.obstacles.length,pontosCorrigidos:points.length,botoesRemovidos:'ok',csv:download.suggestedFilename(),validacao:'origem em obstáculo rejeitada',persistencia:'após recarga',mobile:'ok'};
 }

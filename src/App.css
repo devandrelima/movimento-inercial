@@ -36,7 +36,7 @@
 
 .processing-status{font-size:12px;color:#376b6e;margin:16px 0 0}
 
-.field:active{cursor:grabbing}.field:focus-visible{outline:3px solid #e4a72d;outline-offset:3px}.center-map{position:absolute;right:20px;top:48px;z-index:1;padding:9px 12px;border-radius:5px;background:#fff;color:#23666c;font-size:12px;box-shadow:0 2px 8px #16383b14;touch-action:manipulation}.field-top,.field-foot,.model-note{pointer-events:none}
+.field:active{cursor:grabbing}.field:focus-visible{outline:3px solid #e4a72d;outline-offset:3px}.field-top,.field-foot,.model-note{pointer-events:none}
 
 .trajectory-layer{position:absolute;left:calc(50% + var(--pan-x, 0px));top:calc(50% + var(--pan-y, 0px));overflow:visible;pointer-events:none}
 .model-status{font-size:12px;line-height:1.4;color:#376b6e;margin:14px 0 0}
@@ -60,7 +60,7 @@
   .shell .controls{margin-top:8px;padding-top:0;gap:6px}.shell .play{width:48px;height:48px;flex:0 0 48px;font-size:19px}
   .shell .reset,.shell .download{min-height:44px;padding:8px 10px}.shell .reset span,.shell .download{font-size:12px}
   .shell .field-top,.shell .field-foot{left:12px;right:12px;font-size:11px}.shell .field-top{top:10px}.shell .field-foot{bottom:10px}
-  .shell .model-note{bottom:27px;font-size:11px}.shell .map-zoom{top:36px;right:10px}.shell .center-map{top:36px;right:60px}
+  .shell .model-note{bottom:27px;font-size:11px}.shell .map-zoom{top:36px;right:10px}.shell 
   .shell .map-zoom button{width:42px;height:42px}
 }
 @media(orientation:landscape) and (max-height:600px){

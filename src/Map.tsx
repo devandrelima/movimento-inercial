@@ -15,11 +15,9 @@ export default function Map({ resetKey, segments, room, matched, onEditRoom, onO
   const scale = useRef(INITIAL_SCALE)
   const pointers=useRef(new globalThis.Map<number,Point>())
   const gesture=useRef<Gesture|null>(null)
-  const [panned,setPanned]=useState(false)
   const [pixelsPerMeter,setPixelsPerMeter]=useState(INITIAL_SCALE)
-  const [view,setView]=useState<'corrected'|'raw'>('corrected')
   const [notice,setNotice]=useState<'edit'|'maps'|null>(null)
-  const aligned=room ? [{id:1,points:(view==='raw'?matched?.raw:matched?.corrected)?.map(p=>({x:p.x-room.start.x,y:p.y-room.start.y}))??null}] : segments.map(segment=>({id:segment.id,points:alignForward(segment.points)}))
+  const aligned=room ? [{id:1,points:matched?.corrected?.map(p=>({x:p.x-room.start.x,y:p.y-room.start.y}))??null}] : segments.map(segment=>({id:segment.id,points:alignForward(segment.points)}))
   const awaiting=segments.length===0 || aligned[aligned.length-1].points===null || aligned[aligned.length-1].points?.length===0
   function exportPaths() {
     if(!matched?.raw.length)return
@@ -33,7 +31,6 @@ export default function Map({ resetKey, segments, room, matched, onEditRoom, onO
     offset.current=next
     map.current?.style.setProperty('--pan-x', `${next.x}px`)
     map.current?.style.setProperty('--pan-y', `${next.y}px`)
-    setPanned(next.x!==0 || next.y!==0)
   }
   function setZoom(next:number,anchor:Point={x:0,y:0}) {
     const value=clamp(next),ratio=value/scale.current
@@ -88,10 +85,8 @@ export default function Map({ resetKey, segments, room, matched, onEditRoom, onO
     <div className="room-map-actions" onPointerDown={event=>event.stopPropagation()}>
       <button onClick={()=>{if(locked){setNotice('edit');return}setNotice(null);onEditRoom()}}>{room?'Editar sala':'Criar sala'}</button>
       <button onClick={()=>{if(locked){setNotice('maps');return}setNotice(null);onOpenMaps()}}>Mapas públicos</button>
-      {room && <button onClick={()=>setView(value=>value==='corrected'?'raw':'corrected')} aria-label={view==='corrected'?'Ver trajetória original':'Ver trajetória com mapa'}>{view==='corrected'?'Ver original':'Ver com mapa'}</button>}
       {room && matched?.raw.length ? <button onClick={exportPaths} aria-label="Baixar trajetórias em CSV">CSV</button> : null}
     </div>
-    {panned && <button className="center-map" onPointerDown={event=>event.stopPropagation()} onClick={()=>moveTo({x:0,y:0})}>Centralizar</button>}
     <div className="map-zoom" onPointerDown={event=>event.stopPropagation()} aria-label="Zoom do mapa">
       <button type="button" aria-label="Aumentar zoom" disabled={pixelsPerMeter>=MAX_SCALE} onClick={()=>setZoom(scale.current*1.25)}>+</button>
       <button type="button" aria-label="Diminuir zoom" disabled={pixelsPerMeter<=MIN_SCALE} onClick={()=>setZoom(scale.current/1.25)}>−</button>

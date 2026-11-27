@@ -32,7 +32,7 @@ async page => {
  results.localSemLogin='ok'
 
  // 3) Publicar exige login: senha errada é recusada; a correta abre a publicação.
- await page.getByRole('button',{name:'Editar sala'}).click();await page.getByRole('button',{name:'Publicar…'}).click()
+ await page.getByRole('button',{name:'Editar sala'}).click();await page.getByRole('button',{name:'Publicar',exact:true}).click()
  const login=page.getByRole('dialog',{name:'Entrar'});await login.waitFor()
  await login.getByLabel('Usuário').fill(USER);await login.getByLabel('Senha').fill('senha-errada-'+Date.now());await login.getByRole('button',{name:'Entrar'}).click()
  await login.getByRole('alert').waitFor();if(!(await login.getByRole('alert').innerText()).includes('incorretos'))throw Error('Mensagem de senha errada ausente')
@@ -59,7 +59,7 @@ async page => {
 
  // 5) Editar o mapa público: abre o editor vinculado e atualiza sem novo login (sessão ativa).
  await page.getByRole('button',{name:'Mapas públicos'}).click();await page.locator('li',{hasText:name}).getByRole('button',{name:'Editar'}).click()
- await page.locator('.room-section').nth(0).getByLabel('Largura').fill('11');await page.getByRole('button',{name:'Publicar…'}).click()
+ await page.locator('.room-section').nth(0).getByLabel('Largura').fill('11');await page.getByRole('button',{name:'Publicar',exact:true}).click()
  const update=page.getByRole('dialog',{name:'Publicar mapa'});await update.waitFor()
  await update.getByRole('button',{name:'Atualizar',exact:true}).click();await page.getByRole('button',{name:'Mapas públicos'}).waitFor()
  const maps=await page.evaluate(async()=>(await (await fetch('/api/maps')).json()).maps);const mine=maps.filter(m=>m.name===name)

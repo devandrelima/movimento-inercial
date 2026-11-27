@@ -17,8 +17,8 @@ Todo usuário autenticado pode atualizar ou excluir qualquer mapa público; o no
 ## Uso
 
 - **Carregar:** no mapa, toque em *Mapas públicos* e em *Carregar*. A sala passa a ser a sala local deste aparelho (é preciso que não haja sessão em andamento, como na edição).
-- **Editar:** em *Mapas públicos*, *Editar* abre o editor com o mapa. As alterações são locais até você tocar em *Publicar…* e escolher *Atualizar o mapa público “…”*, o que pede login.
-- **Publicar:** no editor, *Publicar…* pede usuário e senha, depois o nome do mapa. A sala também é salva localmente. Para publicar um mapa derivado como novo, escolha *Publicar como um novo mapa*.
+- **Editar:** em *Mapas públicos*, *Editar* abre o editor com o mapa. As alterações são locais até você tocar em *Publicar* (no cabeçalho, à direita de *Salvar sala*) e escolher *Atualizar o mapa público “…”*, o que pede login.
+- **Publicar:** no editor, *Publicar* pede usuário e senha, depois o nome do mapa. A sala também é salva localmente. Para publicar um mapa derivado como novo, escolha *Publicar como um novo mapa*.
 - **Excluir:** na lista (*Excluir*) ou na janela de publicação. Pede login e confirmação.
 
 O login vale por 12 horas e fica apenas na aba do navegador (`sessionStorage`); *Sair* na lista o encerra antes.

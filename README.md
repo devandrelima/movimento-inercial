@@ -11,7 +11,7 @@ A aplicação publicada está em [embarcado.bemaqui.online](https://embarcado.be
 - Leitura de aceleração com gravidade, giroscópio e orientação; aquisição e inferência locais, sem GPS ou câmera.
 - Pré-processamento a 50 Hz e inferência com o modelo RoNIN v2 float32 no navegador, usando LiteRT.js e WebAssembly.
 - Trajetória em grade métrica com zoom, arraste, início, pausa, reset e exportação das leituras em CSV.
-- Editor de sala retangular e obstáculos com redimensionamento por cantos e arestas, ponto inicial arrastável e direção inicial; correção experimental com filtro de partículas, comparação com o traço original e exportação das duas trajetórias.
+- Editor de sala retangular e obstáculos com redimensionamento por cantos e arestas, ponto inicial arrastável e direção inicial; correção experimental com filtro de partículas, exportação em CSV do traço original e do corrigido.
 - Interface responsiva, build de produção em Docker e servidor Nginx no container.
 
 A versão INT8 está incluída para avaliação, mas a aplicação utiliza o modelo float32. O modelo e seus metadados estão em `public/models/`. O treinamento da v2 foi feito em outra máquina e seu código completo de treinamento não está neste repositório; `ml/` contém ferramentas anteriores de obtenção e inspeção dos dados. O dataset e os arquivos de trabalho não estão incluídos.
@@ -61,6 +61,6 @@ Os testes incluem sensores, permissões, janelas de 50 Hz, referencial, exporta�
 
 - A primeira saída do modelo chega por volta de 3 segundos e não reconstrói aproximadamente os primeiros 2,5 segundos. O usuário deve começar caminhando em linha reta para definir a direção inicial.
 - Leituras indisponíveis, baixa frequência, lacunas, movimento durante pausas e diferenças de calibração ou orientação entre aparelhos podem afetar o resultado.
-- O mapa restringe trajetórias impossíveis conforme a planta informada, mas não garante melhora de precisão nem detecta obstáculos ausentes ou movidos. Se não restarem hipóteses compatíveis, a correção é interrompida e o traço original continua disponível.
+- O mapa restringe trajetórias impossíveis conforme a planta informada, mas não garante melhora de precisão nem detecta obstáculos ausentes ou movidos. Se não restarem hipóteses compatíveis, a correção é interrompida; o traço original continua no CSV de trajetórias.
 - As métricas da v2, relatadas na entrega do treinamento, não são uma validação independente da aplicação em um smartphone. Consulte [o documento técnico](docs/integracao-modelo.md).
 - O RoNIN possui termos próprios de uso dos dados. Verifique a [licença do dataset](https://www.frdr-dfdr.ca/repo/files/8/published/publication_538/submitted_data/LICENSE.txt) e as condições aplicáveis aos artefatos derivados antes de reutilizá-los ou redistribuí-los.
