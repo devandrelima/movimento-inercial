@@ -3,7 +3,14 @@ import type {Point} from './tracker'
 
 // The planned route keeps a geometric clearance, not a guarantee of bodily safety.
 export const ROUTE_CLEARANCE=0.2
-const STEP=0.25
+const MIN_STEP=0.25
+/** Limite de células do A*: acima disso a grade fica mais grossa para a rota não travar a página (500 × 500 m a 25 cm seriam 4 milhões de células, ~12 s). */
+const MAX_CELLS=160000
+/** Resolução da grade: 25 cm até ~100 × 100 m; maior que isso, o menor passo (múltiplo de 5 cm) que respeita o limite de células. */
+export function routeStep(room:Room):number {
+ const needed=Math.sqrt(Math.max(room.width*room.height,1)/MAX_CELLS)
+ return Math.max(MIN_STEP,Math.ceil(needed/0.05-1e-9)*0.05)
+}
 const dist=(a:Point,b:Point)=>Math.hypot(a.x-b.x,a.y-b.y)
 export function routeRoom(room:Room):Room {
  const m=ROUTE_CLEARANCE
@@ -14,12 +21,13 @@ function clearSegment(room:Room,a:Point,b:Point):boolean {
  return traversable(routeRoom(room),{x:a.x-m,y:a.y-m},{x:b.x-m,y:b.y-m})
 }
 export function clearPoint(room:Room,p:Point):boolean{return clearSegment(room,p,p)}
-/** A* on a 25 cm grid; null means no route found at this resolution and clearance. */
+/** A* on a grid of `routeStep` (25 cm up to ~100 × 100 m); null means no route found at this resolution and clearance. */
 export function planRoute(room:Room,start:Point,goal:Point):Point[]|null {
  if(!clearPoint(room,start)||!clearPoint(room,goal))return null
  if(clearSegment(room,start,goal))return [start,goal]
  const expanded=routeRoom(room),m=ROUTE_CLEARANCE
  const clear=(a:Point,b:Point)=>traversable(expanded,{x:a.x-m,y:a.y-m},{x:b.x-m,y:b.y-m})
+ const STEP=routeStep(room)
  const cols=Math.floor(room.width/STEP)+1,rows=Math.floor(room.height/STEP)+1,n=cols*rows
  const point=(i:number):Point=>({x:(i%cols)*STEP,y:Math.floor(i/cols)*STEP})
  const near=(p:Point)=>{

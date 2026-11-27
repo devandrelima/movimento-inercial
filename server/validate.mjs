@@ -1,12 +1,13 @@
 // Validação do formato de sala (versão 1). Espelha `validRoom` de src/room.ts; o teste de paridade
 // em validate.test.mjs compara as duas implementações.
+export const MAX_ROOM_SIZE = 500 // mesmo limite de src/room.ts
 const HEADINGS = ['up', 'right', 'down', 'left']
 const finite = (n) => typeof n === 'number' && Number.isFinite(n)
 const round = (n) => Math.round(n * 1e6) / 1e6
 
 export function validRoom(r) {
   if (!r || typeof r !== 'object') return false
-  if (r.version !== 1 || !finite(r.width) || !finite(r.height) || r.width < 1 || r.height < 1 || r.width > 30 || r.height > 30) return false
+  if (r.version !== 1 || !finite(r.width) || !finite(r.height) || r.width < 1 || r.height < 1 || r.width > MAX_ROOM_SIZE || r.height > MAX_ROOM_SIZE) return false
   if (!r.start || !finite(r.start.x) || !finite(r.start.y) || !HEADINGS.includes(r.heading) || !Array.isArray(r.obstacles) || r.obstacles.length > 20) return false
   if (r.start.x < 0 || r.start.x > r.width || r.start.y < 0 || r.start.y > r.height) return false
   const ids = new Set()

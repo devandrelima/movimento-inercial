@@ -16,6 +16,9 @@ describe('validador de sala do servidor', () => {
     { ...room, version: 2 },
     { ...room, width: 0.5 },
     { ...room, width: 31 },
+    { ...room, width: 500, height: 500 },
+    { ...room, width: 500.5 },
+    { ...room, width: 501, height: 20 },
     { ...room, height: NaN },
     { ...room, heading: 'north' },
     { ...room, start: { x: 9, y: 1 } },
@@ -36,6 +39,8 @@ describe('validador de sala do servidor', () => {
     const cleaned = cleanRoom({ ...room, extra: 1, obstacles: [{ ...room.obstacles[0], note: 'x' }] })
     expect(cleaned).toEqual(room)
     expect(cleanRoom({ ...room, width: 0 })).toBeNull()
+    expect(cleanRoom({ ...room, width: 500, height: 500 })).toMatchObject({ width: 500, height: 500 })
+    expect(cleanRoom({ ...room, width: 501 })).toBeNull()
   })
   it('valida o nome', () => {
     expect(cleanName('  Sala   de  aula ')).toBe('Sala de aula')
@@ -157,7 +162,7 @@ describe('API dos mapas públicos', () => {
     const { json } = await login()
     const post = (body, headers) => call('/api/maps', { method: 'POST', body, token: json.token, headers })
     expect((await post({ name: '', room })).json.error).toBe('bad_name')
-    expect((await post({ name: 'ok', room: { ...room, width: 99 } })).json.error).toBe('bad_room')
+    expect((await post({ name: 'ok', room: { ...room, width: 501 } })).json.error).toBe('bad_room')
     expect((await post({ name: 'ok', room: { ...room, start: { x: 3.5, y: 2.5 } } })).json.error).toBe('bad_room')
     expect((await post('{quebrado')).json.error).toBe('bad_json')
     expect((await post('[]')).json.error).toBe('bad_json')

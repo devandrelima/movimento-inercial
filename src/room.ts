@@ -4,11 +4,14 @@ export type Obstacle={id:string;x:number;y:number;width:number;height:number}
 export type Room={version:1;width:number;height:number;start:Point;heading:Heading;obstacles:Obstacle[]}
 export const DEFAULT_ROOM:Room={version:1,width:8,height:6,start:{x:1,y:1},heading:'up',obstacles:[]}
 export const ROOM_STORAGE_KEY='norte-room-v1'
+/** Maior lado permitido para uma sala, em metros (o menor é 1 m). */
+export const MAX_ROOM_SIZE=500
+export const MIN_ROOM_SIZE=1
 const finite=(n:unknown):n is number=>typeof n==='number'&&Number.isFinite(n)
 export function validRoom(value:unknown):value is Room {
  if(!value||typeof value!=='object')return false
  const r=value as Room
- if(r.version!==1||!finite(r.width)||!finite(r.height)||r.width<1||r.height<1||r.width>30||r.height>30||!r.start||!finite(r.start.x)||!finite(r.start.y)||!['up','right','down','left'].includes(r.heading)||!Array.isArray(r.obstacles)||r.obstacles.length>20)return false
+ if(r.version!==1||!finite(r.width)||!finite(r.height)||r.width<MIN_ROOM_SIZE||r.height<MIN_ROOM_SIZE||r.width>MAX_ROOM_SIZE||r.height>MAX_ROOM_SIZE||!r.start||!finite(r.start.x)||!finite(r.start.y)||!['up','right','down','left'].includes(r.heading)||!Array.isArray(r.obstacles)||r.obstacles.length>20)return false
  if(r.start.x<0||r.start.x>r.width||r.start.y<0||r.start.y>r.height)return false
  const ids=new Set<string>()
  for(const o of r.obstacles){

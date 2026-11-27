@@ -41,7 +41,7 @@ export default function PublishDialog({room,link,auth,onPublished,onDeleted,onCl
     <label><input type="radio" name="mode" checked={mode==='new'} onChange={()=>setMode('new')}/><span>Publicar como um novo mapa</span></label>
    </fieldset>}
    <label className="auth-field"><span>Nome do mapa</span><input value={name} maxLength={60} onChange={e=>setName(e.target.value)} placeholder="Ex.: Laboratório 2" required/></label>
-   {!ok&&<p className="auth-error" role="alert">Confira as medidas: sala de 1 a 30 m, obstáculos dentro dela e ponto inicial livre.</p>}
+   {!ok&&<p className="auth-error" role="alert">Confira as medidas: sala de 1 a 500 m, obstáculos dentro dela e ponto inicial livre.</p>}
    {error&&<p className="auth-error" role="alert">{error}</p>}
    <div className="dialog-actions"><button type="button" className="secondary" onClick={onClose} disabled={busy}>Cancelar</button><button type="submit" className="auth-submit" disabled={busy||!ok||!name.trim()}>{busy?'Aguarde…':link&&mode==='update'?'Atualizar':'Publicar'}</button></div>
    {link&&<button type="button" className="publish-danger" onClick={destroy} disabled={busy}>Excluir o mapa público “{link.name}”</button>}

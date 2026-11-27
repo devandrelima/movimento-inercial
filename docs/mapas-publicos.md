@@ -42,7 +42,7 @@ Trocar a senha invalida os logins anteriores daquele usuário. **Use uma senha f
 - Serviço `norte-api` (Node 22, sem dependências externas) no mesmo Compose. Roda apenas na rede interna do projeto (`internal`, alias `norte-inercial-api`), sem porta publicada e sem entrar na rede compartilhada `automacao-net`. Usa sistema de arquivos somente leitura, usuário sem privilégios, `cap_drop: ALL` e o volume nomeado `maps-data` (em `/data`) para `maps.json`, `users.json` e `secret`.
 - O Nginx do serviço `web` encaminha `/api/` para `norte-inercial-api:3000`. O resto do site continua estático.
 - Senhas com scrypt (sal por usuário); tokens assinados com HMAC-SHA256 (segredo em `/data/secret` ou `TOKEN_SECRET`), com validade de 12 h e invalidados quando a senha muda. Tentativas de login falhas são limitadas por origem (8 em 10 minutos, depois HTTP 429).
-- O servidor valida de novo toda sala recebida (mesmas regras do editor: 1–30 m, até 20 obstáculos dentro da sala, ponto inicial livre), normaliza os campos, limita o corpo a 64 KB, o nome a 60 caracteres e o total a 200 mapas.
+- O servidor valida de novo toda sala recebida (mesmas regras do editor: 1–500 m por lado, até 20 obstáculos dentro da sala, ponto inicial livre), normaliza os campos, limita o corpo a 64 KB, o nome a 60 caracteres e o total a 200 mapas.
 
 ### Endpoints
 

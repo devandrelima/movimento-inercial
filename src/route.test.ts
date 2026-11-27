@@ -1,6 +1,6 @@
 import {describe,it,expect} from 'vitest'
 import {DEFAULT_ROOM,traversable,type Room} from './room'
-import {clearPoint,distanceToRoute,planRoute,ROUTE_CLEARANCE,routeRoom} from './route'
+import {clearPoint,distanceToRoute,planRoute,ROUTE_CLEARANCE,routeRoom,routeStep} from './route'
 import {MapMatcher,RoomPath} from './map-match'
 
 const room:Room={...DEFAULT_ROOM,width:10,height:8,start:{x:1,y:4},obstacles:[{id:'mesa',x:4,y:3,width:2,height:2}]}
@@ -50,4 +50,20 @@ describe('rota sugerida por A*',()=>{
   expect(result.route![0].x).toBeGreaterThan(4)
   expect(result.route!.at(-1)).toEqual({x:2,y:7})
  })
+})
+
+describe('rota em salas grandes',()=>{
+ const sized=(size:number):Room=>({version:1,width:size,height:size,start:{x:2,y:2},heading:'up',obstacles:[{id:'w',x:size/2,y:0,width:2,height:size-20},{id:'v',x:size/4,y:20,width:2,height:size-20}]})
+ it('mantém 25 cm até 100 × 100 m e engrossa a grade depois, sem passar de ~160 mil células',()=>{
+  expect(routeStep(sized(30))).toBe(0.25);expect(routeStep(sized(100))).toBe(0.25)
+  expect(routeStep(sized(200))).toBeCloseTo(0.5);expect(routeStep(sized(500))).toBeCloseTo(1.25)
+  for(const size of [101,250,500]){const step=routeStep(sized(size));expect(Math.pow(size/step+1,2)).toBeLessThan(175000)}
+ })
+ it('planeja rotas válidas em salas de 500 × 500 m em poucos segundos, sem cruzar obstáculos',()=>{
+  const room=sized(500),t=performance.now(),path=planRoute(room,room.start,{x:498,y:2})
+  expect(performance.now()-t).toBeLessThan(5000)
+  expect(path).not.toBeNull()
+  for(let i=1;i<path!.length;i++)expect(traversable(room,path![i-1],path![i])).toBe(true)
+  expect(path!.some(p=>p.y>20)).toBe(true)
+ },20000)
 })

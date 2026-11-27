@@ -1,5 +1,5 @@
 import type {Point} from './tracker'
-import {insideObstacle,type Room} from './room'
+import {insideObstacle,MAX_ROOM_SIZE,MIN_ROOM_SIZE,type Room} from './room'
 
 /** Pontos de controle de um retângulo: cantos (ne, nw, se, sw) e arestas (n, s, e, w). Y cresce para cima. */
 export type HandleDir='n'|'s'|'e'|'w'|'ne'|'nw'|'se'|'sw'
@@ -8,8 +8,8 @@ export type Limits={minX:number;minY:number;maxX:number;maxY:number}
 
 export const RESIZE_STEP=0.05
 export const MIN_OBSTACLE=0.1
-export const MIN_ROOM=1
-export const MAX_ROOM=30
+export const MIN_ROOM=MIN_ROOM_SIZE
+export const MAX_ROOM=MAX_ROOM_SIZE
 
 const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(max,n))
 const clean=(n:number)=>Math.round(n*1e6)/1e6
@@ -29,7 +29,7 @@ export function resizeRect(rect:Rect,dir:HandleDir,p:Point,limits:Limits,min=MIN
  * Redimensiona a sala por uma aresta ou canto. A sala sempre começa em (0,0); ao mover a aresta
  * esquerda ou inferior, o conteúdo é deslocado e `shift` informa o quanto a nova origem andou no
  * referencial anterior (para a tela manter os objetos parados durante o arraste).
- * A sala não encolhe além dos obstáculos e do ponto inicial, nem passa de 1–30 m.
+ * A sala não encolhe além dos obstáculos e do ponto inicial, nem passa de 1–500 m.
  */
 export function resizeRoom(room:Room,dir:HandleDir,p:Point):{room:Room;shift:Point} {
  const finite=(n:number)=>Number.isFinite(n)

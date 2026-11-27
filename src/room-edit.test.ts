@@ -51,11 +51,12 @@ describe('redimensionar a sala',()=>{
   expect(resizeRoom(room,'n',{x:0,y:0}).room.height).toBe(5)
   expect(resizeRoom({...room,obstacles:[]},'e',{x:0,y:0}).room.width).toBe(2)
  })
- it('respeita o mínimo de 1 m e o máximo de 30 m',()=>{
+ it('respeita o mínimo de 1 m e o máximo de 500 m',()=>{
   const empty:Room={...room,start:{x:0,y:0},obstacles:[]}
   expect(resizeRoom(empty,'e',{x:0.2,y:0}).room.width).toBe(1)
-  expect(resizeRoom(empty,'ne',{x:80,y:80}).room).toMatchObject({width:30,height:30})
-  expect(resizeRoom({...empty,width:30},'w',{x:-9,y:0}).room.width).toBe(30)
+  expect(resizeRoom(empty,'ne',{x:80,y:80}).room).toMatchObject({width:80,height:80})
+  expect(resizeRoom(empty,'ne',{x:900,y:900}).room).toMatchObject({width:500,height:500})
+  expect(resizeRoom({...empty,width:500},'w',{x:-9,y:0}).room.width).toBe(500)
  })
  it('ignora valores inválidos de obstáculos em edição',()=>{
   const broken:Room={...room,obstacles:[{id:'a',x:NaN,y:3,width:2,height:2}]}

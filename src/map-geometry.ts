@@ -33,3 +33,20 @@ export function headingAngle(points:Point[], minDistance=0.25, minMovement=0.05)
   if (!anchor || farthest<minMovement) return null
   return Math.atan2(-(last.y-anchor.y),last.x-anchor.x)*180/Math.PI
 }
+
+const GRID_STEPS=[1,2,5,10,20,50,100,200,500]
+/** Menor lado de quadrícula (metros) cuja célula tenha pelo menos `minPixels` na tela; evita uma grade ilegível ao afastar. */
+export function gridStep(pixelsPerMeter:number, minPixels=10):number {
+  return GRID_STEPS.find(step=>step*pixelsPerMeter>=minPixels) ?? GRID_STEPS[GRID_STEPS.length-1]
+}
+
+/**
+ * Escala inicial (pixels por metro) e deslocamento do mapa para uma sala. Se a sala cabe na área no zoom padrão,
+ * mantém o padrão (origem no centro). Se não cabe, afasta até ela caber, com folga, e a centraliza.
+ */
+export function initialView(room:{width:number;height:number;start:Point}, boxWidth:number, boxHeight:number, defaultScale:number, minScale:number):{scale:number;offset:Point} {
+  const fits=room.width*defaultScale<=boxWidth*0.95 && room.height*defaultScale<=boxHeight*0.95
+  if (fits || boxWidth<=0 || boxHeight<=0) return {scale:defaultScale,offset:{x:0,y:0}}
+  const scale=Math.max(minScale,Math.min(defaultScale,0.9*Math.min(boxWidth/room.width,boxHeight/room.height)))
+  return {scale,offset:{x:-(room.width/2-room.start.x)*scale,y:(room.height/2-room.start.y)*scale}}
+}

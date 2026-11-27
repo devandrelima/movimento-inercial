@@ -13,6 +13,12 @@ describe('geometria da sala',()=>{
   expect(validRoom(room)).toBe(true);expect(validRoom({...room,start:{x:4,y:4}})).toBe(false)
   expect(validRoom({...room,obstacles:[{id:'x',x:9,y:9,width:2,height:2}]})).toBe(false)
  })
+ it('aceita salas de 1 a 500 m por lado e recusa fora disso',()=>{
+  const big:Room={...DEFAULT_ROOM,width:500,height:500,start:{x:250,y:250},obstacles:[{id:'a',x:100,y:100,width:50,height:50}]}
+  expect(validRoom(big)).toBe(true);expect(validRoom({...big,width:500.01})).toBe(false);expect(validRoom({...big,height:501})).toBe(false)
+  expect(validRoom({...big,width:1,height:1,start:{x:0.5,y:0.5},obstacles:[]})).toBe(true);expect(validRoom({...big,width:0.99})).toBe(false)
+  expect(validRoom({...big,obstacles:[{id:'a',x:480,y:480,width:21,height:5}]})).toBe(false)
+ })
  it('alinha frente e direita aos eixos selecionados',()=>{
   const forward=roomVector({x:0,y:1},'right');expect(forward.x).toBeCloseTo(1);expect(forward.y).toBeCloseTo(0)
   expect(roomVector({x:1,y:0},'right')).toEqual({x:0,y:-1})

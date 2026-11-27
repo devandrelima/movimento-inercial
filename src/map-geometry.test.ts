@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest'
-import {alignForward,headingAngle,zoomOffset} from './map-geometry'
+import {alignForward,gridStep,headingAngle,initialView,zoomOffset} from './map-geometry'
 describe('mapa',()=>{
  it('usa o primeiro deslocamento para cima e preserva esquerda e direita',()=>{
   const result=alignForward([{x:0,y:0},{x:1,y:0},{x:1,y:-1},{x:1,y:1}])!
@@ -31,5 +31,27 @@ describe('direção da ponta da trajetória',()=>{
  })
  it('usa o deslocamento curto disponível quando é o único',()=>{
   expect(headingAngle([{x:0,y:0},{x:0.1,y:0}])).toBeCloseTo(0)
+ })
+})
+
+describe('grade e vista inicial para salas grandes',()=>{
+ it('mantém 1 m em zoom normal e engrossa a grade ao afastar',()=>{
+  expect(gridStep(48)).toBe(1);expect(gridStep(12)).toBe(1);expect(gridStep(10)).toBe(1)
+  expect(gridStep(5)).toBe(2);expect(gridStep(1.6)).toBe(10);expect(gridStep(0.5)).toBe(20)
+  expect(gridStep(0.001)).toBe(500)
+ })
+ it('mantém o zoom padrão e a origem no centro quando a sala cabe',()=>{
+  expect(initialView({width:10,height:8,start:{x:1,y:1}},900,750,48,0.5)).toEqual({scale:48,offset:{x:0,y:0}})
+ })
+ it('afasta e centraliza a sala quando ela não cabe',()=>{
+  const v=initialView({width:500,height:500,start:{x:10,y:20}},900,750,48,0.5)
+  expect(v.scale).toBeCloseTo(0.9*750/500)
+  // o centro da sala (250, 250) cai no centro da área: origem deslocada por -(250-10), +(250-20) metros
+  expect(v.offset.x).toBeCloseTo(-240*v.scale);expect(v.offset.y).toBeCloseTo(230*v.scale)
+  expect(500*v.scale).toBeLessThanOrEqual(750)
+ })
+ it('respeita a escala mínima e áreas ainda sem tamanho',()=>{
+  expect(initialView({width:500,height:500,start:{x:0,y:0}},100,100,48,0.5).scale).toBe(0.5)
+  expect(initialView({width:500,height:500,start:{x:0,y:0}},0,0,48,0.5)).toEqual({scale:48,offset:{x:0,y:0}})
  })
 })

@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import type {Segment} from './tracker'
-import {alignForward,headingAngle,zoomOffset} from './map-geometry'
+import {alignForward,gridStep,headingAngle,initialView,zoomOffset} from './map-geometry'
 import {roomVector,type Room} from './room'
 import type {MatchedPath} from './map-match'
 
 type Point = { x: number; y: number }
 type Gesture = {scale:number;offset:Point;center:Point;distance:number}
 const TAP_SLOP=8
-const MIN_SCALE=12,MAX_SCALE=192,INITIAL_SCALE=48
+const MIN_SCALE=0.5,MAX_SCALE=192,INITIAL_SCALE=48
 const clamp=(value:number)=>Math.max(MIN_SCALE,Math.min(MAX_SCALE,value))
 
 export default function Map({ resetKey, segments, room, matched, goal, route, onPickGoal, onEditRoom, onOpenMaps, locked, limited=false }: { resetKey:number;segments:Segment[];room:Room|null;matched:MatchedPath|null;goal:Point|null;route:Point[]|null;onPickGoal:(point:Point)=>string|null;onEditRoom:()=>void;onOpenMaps:()=>void;locked:boolean;limited?:boolean }) {
@@ -20,6 +20,7 @@ export default function Map({ resetKey, segments, room, matched, goal, route, on
   const [notice,setNotice]=useState<'edit'|'maps'|null>(null)
   const [goalNotice,setGoalNotice]=useState<string|null>(null)
   const tap=useRef<{id:number;x:number;y:number}|null>(null),goalTimer=useRef(0)
+  const grid=gridStep(pixelsPerMeter,10)
   const aligned=room ? [{id:1,points:matched?.corrected?.map(p=>({x:p.x-room.start.x,y:p.y-room.start.y}))??null}] : segments.map(segment=>({id:segment.id,points:alignForward(segment.points)}))
   const awaiting=segments.length===0 || aligned[aligned.length-1].points===null || aligned[aligned.length-1].points?.length===0
   function exportPaths() {
@@ -49,7 +50,12 @@ export default function Map({ resetKey, segments, room, matched, goal, route, on
     element.addEventListener('wheel',wheel,{passive:false})
     return ()=>element.removeEventListener('wheel',wheel)
   },[])
-  useEffect(()=>{pointers.current.clear();tap.current=null;gesture.current=null;moveTo({x:0,y:0});scale.current=INITIAL_SCALE;setPixelsPerMeter(INITIAL_SCALE);setNotice(null)},[resetKey])
+  useEffect(()=>{
+    pointers.current.clear();tap.current=null;gesture.current=null
+    // Sala que não cabe no zoom padrão (até 500 × 500 m): abre afastada e centralizada.
+    const box=map.current!.getBoundingClientRect(),view=room?initialView(room,box.width,box.height,INITIAL_SCALE,MIN_SCALE):{scale:INITIAL_SCALE,offset:{x:0,y:0}}
+    moveTo(view.offset);scale.current=view.scale;setPixelsPerMeter(view.scale);setNotice(null)
+  },[resetKey])
   function beginGesture() {
     const points=[...pointers.current.values()]
     if(!points.length){gesture.current=null;return}
@@ -96,8 +102,8 @@ export default function Map({ resetKey, segments, room, matched, goal, route, on
     if(event.key==='+' || event.key==='='){event.preventDefault();setZoom(scale.current*1.25)}
     if(event.key==='-'){event.preventDefault();setZoom(scale.current/1.25)}
   }
-  return <section ref={map} className="field" style={{'--grid-size':`${pixelsPerMeter}px`,'--grid-half':`${pixelsPerMeter/2}px`} as React.CSSProperties} role="region" tabIndex={0} aria-label="Plano de trajetória. Arraste para navegar; use os botões ou gesto de pinça para ajustar o zoom." onPointerDown={start} onPointerMove={move} onPointerUp={up} onPointerCancel={end} onLostPointerCapture={end} onKeyDown={keyboard}>
-    <div className="field-top"><span>Plano de trajetória</span><span>Grade: 1 m × 1 m</span></div>
+  return <section ref={map} className="field" style={{'--grid-size':`${pixelsPerMeter*grid}px`,'--grid-half':`${pixelsPerMeter*grid/2}px`} as React.CSSProperties} role="region" tabIndex={0} aria-label="Plano de trajetória. Arraste para navegar; use os botões ou gesto de pinça para ajustar o zoom." onPointerDown={start} onPointerMove={move} onPointerUp={up} onPointerCancel={end} onLostPointerCapture={end} onKeyDown={keyboard}>
+    <div className="field-top"><span>Plano de trajetória</span><span>Grade: {grid.toLocaleString('pt-BR')} m × {grid.toLocaleString('pt-BR')} m</span></div>
     <div className="room-map-actions" onPointerDown={event=>event.stopPropagation()}>
       <button onClick={()=>{if(locked){setNotice('edit');return}setNotice(null);onEditRoom()}}>{room?'Editar sala':'Criar sala'}</button>
       <button onClick={()=>{if(locked){setNotice('maps');return}setNotice(null);onOpenMaps()}}>Mapas públicos</button>
