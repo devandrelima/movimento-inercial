@@ -1,6 +1,6 @@
 import {describe,expect,it} from 'vitest'
 import {DEFAULT_ROOM,validRoom,type Room} from './room'
-import {coversPoint,resizeRect,resizeRoom} from './room-edit'
+import {coversPoint,fitView,growView,resizeRect,resizeRoom} from './room-edit'
 
 const limits={minX:0,minY:0,maxX:10,maxY:8}
 const rect={x:4,y:3,width:2,height:2}
@@ -66,5 +66,24 @@ describe('redimensionar a sala',()=>{
 describe('ponto inicial',()=>{
  it('detecta quando um obstáculo cobre o ponto',()=>{
   expect(coversPoint(rect,{x:5,y:4})).toBe(true);expect(coversPoint(rect,{x:2,y:2})).toBe(false)
+ })
+})
+
+describe('janela da planta',()=>{
+ it('ajusta a sala deixando a folga em pixels dos dois lados',()=>{
+  const v=fitView(10,5,500,400,20),scale=500/v.w
+  expect(v.x).toBeCloseTo(-20/scale);expect(v.w).toBeCloseTo(10+2*20/scale);expect(scale*10).toBeCloseTo(460)
+  const tall=fitView(5,10,500,400,20);expect(400/tall.h*10).toBeCloseTo(360)
+ })
+ it('não muda a janela enquanto a sala cabe',()=>{
+  const view={x:-1,y:-1,w:12,h:8},vis={l:-1,r:11,b:-1,t:7}
+  expect(growView(view,vis,{l:0,r:10,b:0,t:6},1,0.5)).toEqual(view)
+  expect(growView(view,vis,{l:0,r:9.5,b:0,t:6},1,0.5,0.01)).toEqual(view)
+ })
+ it('afasta a janela gradualmente quando a sala passa do limite visível',()=>{
+  const view={x:-1,y:-1,w:12,h:8},vis={l:-1,r:11,b:-1,t:7}
+  const a=growView(view,vis,{l:0,r:20,b:0,t:6},1,0.5)
+  expect(a.x).toBe(-1);expect(a.y).toBe(-1);expect(a.x+a.w).toBeCloseTo(11+(21-11)*0.5);expect(a.h).toBe(8)
+  const b=growView(a,vis,{l:-4,r:20,b:0,t:12},1,1);expect(b.x).toBe(-5);expect(b.x+b.w).toBe(21);expect(b.y+b.h).toBe(13)
  })
 })

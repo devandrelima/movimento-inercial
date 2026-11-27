@@ -50,3 +50,30 @@ export function resizeRoom(room:Room,dir:HandleDir,p:Point):{room:Room;shift:Poi
 }
 
 export const coversPoint=(rect:Rect,p:Point)=>insideObstacle(p,{id:'',...rect})
+
+/** Janela visível da planta, em metros (Y para cima). */
+export type View={x:number;y:number;w:number;h:number}
+export type Bounds={l:number;r:number;b:number;t:number}
+/** Folga, em pixels, entre a sala e a borda da área de desenho (cabe as alças de controle). */
+export const VIEW_PAD=18
+
+/** Janela que ajusta a sala à área de desenho, deixando `pad` pixels livres em volta. */
+export function fitView(width:number,height:number,boxW:number,boxH:number,pad=VIEW_PAD):View {
+ const room=Math.min(Math.max(1,boxW-2*pad)/width,Math.max(1,boxH-2*pad)/height)
+ const m=pad/room
+ return {x:-m,y:-m,w:width+2*m,h:height+2*m}
+}
+
+/**
+ * Afasta a janela (zoom out) quando a sala, com `pad` de folga, passa do que está visível `vis`.
+ * Cada chamada percorre a fração `ease` da distância restante, para a escala mudar de forma contínua;
+ * `eps` evita reagir a diferenças de arredondamento. Nunca aproxima a janela.
+ */
+export function growView(view:View,vis:Bounds,room:Bounds,pad:number,ease:number,eps=0):View {
+ let l=view.x,r=view.x+view.w,b=view.y,t=view.y+view.h
+ if(room.l-pad<vis.l-eps)l+=(room.l-pad-l)*ease
+ if(room.r+pad>vis.r+eps)r+=(room.r+pad-r)*ease
+ if(room.b-pad<vis.b-eps)b+=(room.b-pad-b)*ease
+ if(room.t+pad>vis.t+eps)t+=(room.t+pad-t)*ease
+ return {x:l,y:b,w:r-l,h:t-b}
+}

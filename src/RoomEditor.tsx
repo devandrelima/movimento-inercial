@@ -1,7 +1,8 @@
-import {useLayoutEffect,useRef,useState,type PointerEvent} from 'react'
+import {useEffect,useLayoutEffect,useRef,useState,type PointerEvent} from 'react'
+import {flushSync} from 'react-dom'
 import {DEFAULT_ROOM,insideObstacle,validRoom,type Heading,type Room,type Obstacle} from './room'
 import type {Point} from './tracker'
-import {coversPoint,resizeRect,resizeRoom,type HandleDir,type Rect} from './room-edit'
+import {coversPoint,fitView,growView,resizeRect,resizeRoom,VIEW_PAD,type HandleDir,type Rect,type View} from './room-edit'
 import './RoomEditor.css'
 
 type Props={initial:Room|null;onSave:(room:Room|null)=>void;onCancel:()=>void}
@@ -15,7 +16,7 @@ type Gesture={pointer:number}&(
  {kind:'resize';id:string;dir:HandleDir;ox:number;oy:number;base:Rect}|
  {kind:'room';dir:HandleDir;ox:number;oy:number;base:Room}|
  {kind:'start';dx:number;dy:number})
-type Frame={w:number;h:number;sx:number;sy:number}
+type Frame=View&{sx:number;sy:number}
 const DIRS:{dir:HandleDir;sx:number;sy:number}[]=[{dir:'n',sx:0,sy:1},{dir:'s',sx:0,sy:-1},{dir:'e',sx:1,sy:0},{dir:'w',sx:-1,sy:0},{dir:'ne',sx:1,sy:1},{dir:'nw',sx:-1,sy:1},{dir:'se',sx:1,sy:-1},{dir:'sw',sx:-1,sy:-1}]
 const CURSOR:Record<HandleDir,string>={n:'ns-resize',s:'ns-resize',e:'ew-resize',w:'ew-resize',ne:'nesw-resize',sw:'nesw-resize',nw:'nwse-resize',se:'nwse-resize'}
 const REACH=14,INNER=10
@@ -38,17 +39,26 @@ export default function RoomEditor({initial,onSave,onCancel}:Props) {
  const [room,setRoom]=useState<Room>(()=>initial?structuredClone(initial):structuredClone(DEFAULT_ROOM))
  const [selected,setSelected]=useState<string|null>(null),[positionMode,setPositionMode]=useState(false),[attempted,setAttempted]=useState(false)
  const [frame,setFrame]=useState<Frame|null>(null),[ppu,setPpu]=useState(40),[dragging,setDragging]=useState<Gesture['kind']|null>(null)
- const svg=useRef<SVGSVGElement>(null),drag=useRef<Gesture|null>(null)
+ const [box,setBox]=useState({w:600,h:400})
+ const svg=useRef<SVGSVGElement>(null),drag=useRef<Gesture|null>(null),frameRef=useRef<Frame|null>(null),pointerRef=useRef<Point|null>(null),lastRoom=useRef<Room|null>(null),lastKey=useRef(''),loop=useRef(0),tween=useRef(0),lastTick=useRef(0)
  const object=room.obstacles.find(o=>o.id===selected)
  const safeWidth=Number.isFinite(room.width)&&room.width>=1?Math.min(room.width,30):8
  const safeHeight=Number.isFinite(room.height)&&room.height>=1?Math.min(room.height,30):6
- // Durante o arraste de uma aresta da sala a janela fica congelada, para a escala não mudar sob o ponteiro.
- const view=frame??{w:safeWidth,h:safeHeight,sx:0,sy:0}
+ // Em repouso a janela ajusta a sala à área de desenho. Ao arrastar uma aresta da sala, ela só se afasta
+ // (zoom out contínuo) quando a sala chega ao limite da grade, mantendo a escala estável no resto do gesto.
+ const rest:Frame={...fitView(safeWidth,safeHeight,box.w,box.h),sx:0,sy:0}
+ const view=frame??rest
  useLayoutEffect(()=>{
   const el=svg.current;if(!el)return
-  const measure=()=>{const m=el.getScreenCTM();if(m&&m.a>0)setPpu(Math.round(m.a*100)/100)}
+  const measure=()=>{
+   const r=el.getBoundingClientRect(),w=Math.round(r.width*100)/100,h=Math.round(r.height*100)/100
+   setBox(b=>b.w===w&&b.h===h?b:{w,h})
+   const m=el.getScreenCTM();if(m&&m.a>0)setPpu(Math.round(m.a*100)/100)
+  }
   measure();const observer=new ResizeObserver(measure);observer.observe(el);return()=>observer.disconnect()
- },[view.w,view.h])
+ },[view.x,view.y,view.w,view.h])
+ useEffect(()=>()=>{cancelAnimationFrame(loop.current);cancelAnimationFrame(tween.current)},[])
+ function commitFrame(next:Frame|null){frameRef.current=next;setFrame(next)}
  function update(patch:Partial<Room>){setRoom(r=>({...r,...patch}))}
  function updateObstacle(id:string,patch:Partial<Obstacle>){setRoom(r=>({...r,obstacles:r.obstacles.map(o=>o.id===id?{...o,...patch}:o)}))}
  function addObstacle(){
@@ -76,7 +86,13 @@ export default function RoomEditor({initial,onSave,onCancel}:Props) {
   if(handle){
    const dir=handle.getAttribute('data-handle') as HandleDir,id=handle.getAttribute('data-target')
    const edge=(base:Rect)=>({ox:dir.includes('w')?base.x-raw.x:dir.includes('e')?base.x+base.width-raw.x:0,oy:dir.includes('s')?base.y-raw.y:dir.includes('n')?base.y+base.height-raw.y:0})
-   if(id==='room'){const base={...room,width:safeWidth,height:safeHeight};setFrame({w:safeWidth,h:safeHeight,sx:0,sy:0});begin(event,{kind:'room',pointer,dir,base,...edge({x:0,y:0,width:safeWidth,height:safeHeight})});return}
+   if(id==='room'){
+    const base={...room,width:safeWidth,height:safeHeight}
+    cancelAnimationFrame(tween.current);commitFrame({...(frameRef.current??rest),sx:0,sy:0});lastRoom.current=base;lastKey.current=''
+    pointerRef.current={x:event.clientX,y:event.clientY}
+    begin(event,{kind:'room',pointer,dir,base,...edge({x:0,y:0,width:safeWidth,height:safeHeight})})
+    lastTick.current=0;loop.current=requestAnimationFrame(tick);return
+   }
    const o=room.obstacles.find(item=>item.id===id);if(!o)return
    const base={x:o.x,y:o.y,width:o.width,height:o.height};begin(event,{kind:'resize',pointer,id:o.id,dir,base,...edge(base)});return
   }
@@ -88,7 +104,7 @@ export default function RoomEditor({initial,onSave,onCancel}:Props) {
  function move(event:PointerEvent<SVGSVGElement>){
   const g=drag.current,raw=point(event)
   if(!g||g.pointer!==event.pointerId||!raw)return
-  if(g.kind==='room'){const next=resizeRoom(g.base,g.dir,{x:raw.x+g.ox,y:raw.y+g.oy});setRoom(next.room);setFrame(f=>f&&{...f,sx:next.shift.x,sy:next.shift.y});return}
+  if(g.kind==='room'){pointerRef.current={x:event.clientX,y:event.clientY};stepRoom();return}
   if(g.kind==='start'){
    const p={x:round(clamp(raw.x+g.dx,0,safeWidth)),y:round(clamp(raw.y+g.dy,0,safeHeight))}
    if(!room.obstacles.some(o=>coversPoint(o,p)))update({start:p});return
@@ -99,15 +115,51 @@ export default function RoomEditor({initial,onSave,onCancel}:Props) {
    :resizeRect(g.base,g.dir,{x:raw.x+g.ox,y:raw.y+g.oy},roomLimits)
   if(!coversPoint(next,room.start))updateObstacle(g.id,next)
  }
- function end(){if(drag.current?.kind==='room')setFrame(null);drag.current=null;setDragging(null)}
+
+ /** Aplica o ponteiro à sala e afasta a janela se a sala chegou ao limite visível. */
+ function stepRoom(ease=0){
+  const g=drag.current,el=svg.current,m=el?.getScreenCTM(),p=pointerRef.current,f=frameRef.current
+  if(!g||g.kind!=='room'||!el||!m||!p||!f)return
+  const next=resizeRoom(g.base,g.dir,{x:(p.x-m.e)/m.a+g.ox,y:-(p.y-m.f)/m.d+g.oy})
+  const r=el.getBoundingClientRect()
+  const vis={l:(r.left-m.e)/m.a,r:(r.right-m.e)/m.a,b:-(r.bottom-m.f)/m.d,t:-(r.top-m.f)/m.d}
+  const bounds={l:next.shift.x,r:next.shift.x+next.room.width,b:next.shift.y,t:next.shift.y+next.room.height}
+  const grown=growView(f,vis,bounds,VIEW_PAD/m.a,ease,1/m.a),nf:Frame={...grown,sx:next.shift.x,sy:next.shift.y}
+  const key=[next.room.width,next.room.height,nf.x,nf.y,nf.w,nf.h,nf.sx,nf.sy].map(n=>Math.round(n*1e6)).join()
+  if(key===lastKey.current)return
+  lastKey.current=key;lastRoom.current=next.room
+  flushSync(()=>{setRoom(next.room);commitFrame(nf)})
+ }
+ // O afastamento depende do tempo (não da taxa de eventos do ponteiro): ~30% da distância por quadro de 60 Hz.
+ function tick(now:number){const dt=lastTick.current?Math.min(64,Math.max(0,now-lastTick.current)):16.7;lastTick.current=now;stepRoom(1-(1-0.3)**(dt/16.7));loop.current=requestAnimationFrame(tick)}
+ /** Ao soltar, a janela desliza até o ajuste final da sala em vez de saltar. */
+ function settle(){
+  const f=frameRef.current,el=svg.current,final=lastRoom.current
+  if(!f||!el||!final){commitFrame(null);return}
+  const r=el.getBoundingClientRect(),goal=fitView(final.width,final.height,r.width,r.height)
+  const from={x:f.x-f.sx,y:f.y-f.sy,w:f.w,h:f.h},t0=performance.now()
+  commitFrame({...from,sx:0,sy:0})
+  const run=(now:number)=>{
+   const k=Math.min(1,(now-t0)/180),e=1-(1-k)**3
+   if(k>=1){commitFrame(null);return}
+   commitFrame({x:from.x+(goal.x-from.x)*e,y:from.y+(goal.y-from.y)*e,w:from.w+(goal.w-from.w)*e,h:from.h+(goal.h-from.h)*e,sx:0,sy:0})
+   tween.current=requestAnimationFrame(run)
+  }
+  tween.current=requestAnimationFrame(run)
+ }
+ function end(){
+  const g=drag.current;drag.current=null;setDragging(null)
+  if(g?.kind!=='room')return
+  cancelAnimationFrame(loop.current);settle()
+ }
  const u=(px:number)=>px/ppu,tx=view.sx,ty=-view.sy
  const roomActive=!object&&!positionMode
  function save(){setAttempted(true);if(validRoom(room))onSave(room)}
- return <main className="room-page"><div className="room-editor">
+ return <div className="room-page" role="main"><div className="room-editor">
   <header className="room-header"><div><span className="room-kicker">AMBIENTE</span><h1>Editor de sala</h1></div><div className="room-header-actions"><button className="room-ghost" onClick={onCancel}>Cancelar</button><button className="room-save" onClick={save}>Salvar sala</button></div></header>
   <div className="room-layout"><section className="room-canvas-panel" aria-label="Planta da sala">
    <div className="room-canvas-title"><span style={{whiteSpace:"nowrap"}}>Planta em metros</span><span>Arraste cantos e bordas para redimensionar · ● para mudar o início</span></div>
-   <div className="room-canvas-wrap"><svg ref={svg} className="room-canvas" viewBox={`0 ${-view.h} ${view.w} ${view.h}`} preserveAspectRatio="xMidYMid meet" onPointerDown={down} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end} role="img" aria-label="Planta da sala com obstáculos e posição inicial">
+   <div className="room-canvas-wrap"><svg ref={svg} className="room-canvas" viewBox={`${view.x} ${-(view.y+view.h)} ${view.w} ${view.h}`} preserveAspectRatio="xMidYMid meet" onPointerDown={down} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end} role="img" aria-label="Planta da sala com obstáculos e posição inicial">
     <defs><pattern id="room-grid" width="1" height="1" patternUnits="userSpaceOnUse"><path d="M 1 0 L 0 0 0 1" fill="none" stroke="#dbe8e6" strokeWidth=".025"/></pattern></defs>
     <g transform={`translate(${tx} ${ty})`}>
      <rect x="0" y={-safeHeight} width={safeWidth} height={safeHeight} fill="#f8fbfa"/><rect x="0" y={-safeHeight} width={safeWidth} height={safeHeight} fill="url(#room-grid)"/>
@@ -119,15 +171,13 @@ export default function RoomEditor({initial,onSave,onCancel}:Props) {
      {positionMode&&<circle cx={room.start.x} cy={-room.start.y} r={Math.max(.19,u(7))} fill="#126c70" stroke="white" strokeWidth={Math.max(.06,u(2))} pointerEvents="none"/>}
     </g>
    </svg></div>
-   <p className="room-canvas-help">{positionMode?'Toque na planta para marcar o ponto inicial.':'● Início (arraste) · ■ Obstáculo · puxe cantos e bordas'}</p>
+   {attempted&&!validRoom(room)?<p className="room-error room-canvas-error" role="alert">Confira as medidas: sala de 1 a 30 m, obstáculos dentro dela e ponto inicial livre.</p>:<p className="room-canvas-help">{positionMode?'Toque na planta para marcar o ponto inicial.':'● Início (arraste) · ■ Obstáculo · puxe cantos e bordas'}</p>}
   </section><aside className="room-settings" aria-label="Configuração da sala">
-   <div className="room-section"><div className="room-section-title"><h2>Dimensões da sala</h2><span>metros</span></div><div className="room-fields two"><NumberField label="Largura" value={room.width} onChange={width=>update({width})}/><NumberField label="Altura" value={room.height} onChange={height=>update({height})}/></div></div>
+   <div className="room-section"><div className="room-section-title"><h2>Dimensões da sala <span>(metros)</span></h2>{initial&&<button className="room-link room-danger" onClick={()=>{if(window.confirm('Remover a sala e os obstáculos salvos neste dispositivo?'))onSave(null)}}>Remover sala</button>}</div><div className="room-fields two"><NumberField label="Largura" value={room.width} onChange={width=>update({width})}/><NumberField label="Altura" value={room.height} onChange={height=>update({height})}/></div></div>
    <div className="room-section"><div className="room-section-title"><h2>Início da caminhada</h2><button className={`room-link${positionMode?' active':''}`} onClick={()=>{setPositionMode(!positionMode);setSelected(null)}}>Marcar no mapa</button></div><div className="room-fields three"><NumberField label="X (m)" value={room.start.x} onChange={x=>update({start:{...room.start,x}})}/><NumberField label="Y (m)" value={room.start.y} onChange={y=>update({start:{...room.start,y}})}/><label className="room-number"><span>Frente</span><select value={room.heading} onChange={event=>update({heading:event.target.value as Heading})}><option value="up">↑ Cima</option><option value="right">→ Direita</option><option value="down">↓ Baixo</option><option value="left">← Esquerda</option></select></label></div></div>
    <div className="room-section"><div className="room-section-title"><h2>Obstáculos <span>({room.obstacles.length}/20)</span></h2><button className="room-link" onClick={addObstacle} disabled={room.obstacles.length>=20}>+ Adicionar</button></div>
     {object ? <><div className="room-fields four"><NumberField label="X" value={object.x} onChange={x=>updateObstacle(object.id,{x})}/><NumberField label="Y" value={object.y} onChange={y=>updateObstacle(object.id,{y})}/><NumberField label="Largura" value={object.width} onChange={width=>updateObstacle(object.id,{width})}/><NumberField label="Altura" value={object.height} onChange={height=>updateObstacle(object.id,{height})}/></div><button className="room-delete" onClick={()=>{setRoom(r=>({...r,obstacles:r.obstacles.filter(o=>o.id!==object.id)}));setSelected(null)}}>Remover selecionado</button></> : <p className="room-empty">{room.obstacles.length?'Selecione um obstáculo na planta.':'Adicione mesas, armários ou outros obstáculos fixos.'}</p>}
    </div>
-   {attempted&&!validRoom(room)&&<p className="room-error" role="alert">Confira as medidas: sala de 1 a 30 m, obstáculos dentro dela e ponto inicial livre.</p>}
-   {initial&&<button className="room-remove" onClick={()=>{if(window.confirm('Remover a sala e os obstáculos salvos neste dispositivo?'))onSave(null)}}>Remover sala</button>}
   </aside></div>
- </div></main>
+ </div></div>
 }

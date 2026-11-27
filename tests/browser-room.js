@@ -8,7 +8,7 @@ async page => {
  await page.getByLabel('Largura',{exact:true}).fill('10');await page.getByLabel('Altura',{exact:true}).fill('8');
  await page.getByRole('button',{name:'Adicionar'}).click();
  const screen=(x,y)=>page.locator('.room-canvas').evaluate((el,[x,y])=>{const p=el.createSVGPoint();p.x=x;p.y=-y;const q=p.matrixTransform(el.getScreenCTM());return{x:q.x,y:q.y}},[x,y]);
- async function drag(from,to,steps=8){const a=await screen(...from),b=await screen(...to);await page.mouse.move(a.x,a.y);await page.mouse.down();await page.mouse.move(b.x,b.y,{steps});await page.mouse.up()}
+ async function drag(from,to,steps=8){const a=await screen(...from),b=await screen(...to);await page.mouse.move(a.x,a.y);await page.mouse.down();await page.mouse.move(b.x,b.y,{steps});await page.mouse.up();await page.waitForTimeout(260)}
  await drag([5,4],[6,5],5);
  const draggedX=Number(await page.locator('.room-section').nth(2).getByLabel('X',{exact:true}).inputValue());if(Math.abs(draggedX-5.5)>.1)throw Error('Obstáculo não acompanhou o arraste: '+draggedX);
  const controls=page.locator('.room-section').nth(2);await controls.getByLabel('X',{exact:true}).fill('4');await controls.getByLabel('Y',{exact:true}).fill('3');await controls.getByLabel('Largura').fill('2');await controls.getByLabel('Altura').fill('2');
@@ -24,13 +24,13 @@ async page => {
  await drag([4,4.5],[3,4.5]);near(await field(controls,'X'),3,'aresta esquerda (X)');near(await field(controls,'Largura'),5,'aresta esquerda (largura)');
  await controls.getByLabel('X',{exact:true}).fill('4');await controls.getByLabel('Y',{exact:true}).fill('3');await controls.getByLabel('Largura').fill('2');await controls.getByLabel('Altura').fill('2');
  await drag([8.5,7],[8.6,7.1],2);if(await controls.getByLabel('Largura').count()!==0)throw Error('Clique no vazio não desmarcou o obstáculo');
- await drag([10,4],[12,4]);near(await field(dims,'Largura'),12,'aresta direita da sala');
- await drag([12,4],[2,4]);near(await field(dims,'Largura'),6,'sala não encolhe além do obstáculo');
- await drag([0,0],[-2,-1]);near(await field(dims,'Largura'),8,'canto inferior esquerdo (largura)');near(await field(dims,'Altura'),9,'canto inferior esquerdo (altura)');near(await field(startBox,'X (m)'),3,'início acompanha a origem da sala');
- await dims.getByLabel('Largura').fill('10');await dims.getByLabel('Altura').fill('8');
- const o=await screen(7,5);await page.mouse.click(o.x,o.y);near(await field(controls,'X'),6,'obstáculo deslocado com a sala');
+ await drag([10,4],[12,4]);const grown=await field(dims,'Largura');if(grown<11.95||grown>20)throw Error('aresta direita da sala: '+grown);
+ await drag([grown,4],[2,4]);near(await field(dims,'Largura'),6,'sala não encolhe além do obstáculo');
+ await drag([0,0],[-2,-1]);const gw=await field(dims,'Largura'),gh=await field(dims,'Altura');if(gw<7.95||gw>16||gh<8.95||gh>20)throw Error('canto inferior esquerdo: '+gw+' x '+gh);near(await field(startBox,'X (m)'),gw-5,'início acompanha a origem da sala (X)');near(await field(startBox,'Y (m)'),gh-7,'início acompanha a origem da sala (Y)')
+ const o=await screen(gw-1,gh-4);await page.mouse.click(o.x,o.y);near(await field(controls,'X'),gw-2,'obstáculo deslocado com a sala');
  await controls.getByLabel('X',{exact:true}).fill('4');await controls.getByLabel('Y',{exact:true}).fill('3');
  await startBox.getByLabel('X (m)').fill('1');await startBox.getByLabel('Y (m)').fill('1');
+ await dims.getByLabel('Largura').fill('10');await dims.getByLabel('Altura').fill('8');
  await page.getByRole('button',{name:'Marcar no mapa'}).click();
  const start=await screen(1,2);
  await page.mouse.click(start.x,start.y);if(Math.abs(Number(await page.getByLabel('Y (m)').inputValue())-2)>.05)throw Error('Ponto inicial não foi marcado');
