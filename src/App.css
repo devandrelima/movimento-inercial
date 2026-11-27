@@ -73,3 +73,6 @@
   .shell .sensor-status,.shell .orientation-status,.shell .processing-status,.shell .model-status,.shell .hint{font-size:10px;line-height:1.2;margin-top:3px}
   .shell .controls{margin-top:auto;padding-top:5px;gap:4px}.shell .play{width:44px;height:44px;flex:0 0 44px;font-size:18px}.shell .reset,.shell .download{min-height:44px;padding:6px 8px}.shell .reset span,.shell .download{font-size:11px}
 }
+.room-map-actions{position:absolute;z-index:1;left:18px;top:48px;display:flex;flex-wrap:wrap;gap:6px;max-width:calc(100% - 100px)}
+.room-map-actions button{min-height:38px;padding:0 10px;border-radius:5px;background:#fff;color:#23666c;font-size:12px;box-shadow:0 2px 8px #16383b14}
+@media(max-width:767px){.room-map-actions{left:10px;top:36px;gap:4px;max-width:calc(100% - 75px)}.room-map-actions button{min-height:38px;padding:0 8px;font-size:11px}}
