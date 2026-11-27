@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import type {Segment} from './tracker'
-import {alignForward,zoomOffset} from './map-geometry'
+import {alignForward,headingAngle,zoomOffset} from './map-geometry'
 import {roomVector,type Room} from './room'
 import type {MatchedPath} from './map-match'
 
@@ -99,10 +99,12 @@ export default function Map({ resetKey, segments, room, matched, goal, route, on
       {room && <line x1="0" y1="0" x2={roomVector({x:0,y:1},room.heading).x*30} y2={-roomVector({x:0,y:1},room.heading).y*30} stroke="#568b83" strokeWidth="2" markerEnd="url(#room-direction-arrow)"/>}
       {aligned.map((segment,index)=>{
         if(!segment.points)return null
-        const last=segment.points[segment.points.length-1]
+        const last=segment.points[segment.points.length-1],heading=segment.points.length>1?headingAngle(segment.points):null
         return <g key={segment.id} opacity={index===aligned.length-1?1:0.35}>
           <polyline points={segment.points.map(point=>`${point.x*pixelsPerMeter},${-point.y*pixelsPerMeter}`).join(' ')} fill="none" stroke="#087a80" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-          {segment.points.length>1 && <circle cx={last.x*pixelsPerMeter} cy={-last.y*pixelsPerMeter} r="5" fill="#087a80" stroke="white" strokeWidth="2"/>}
+          {segment.points.length>1 && (heading===null
+            ? <circle cx={last.x*pixelsPerMeter} cy={-last.y*pixelsPerMeter} r="5" fill="#087a80" stroke="white" strokeWidth="2"/>
+            : <polygon className="trail-arrow" data-heading={heading.toFixed(1)} aria-label="Direção atual" points="12,0 -9,-9.5 -4,0 -9,9.5" transform={`translate(${last.x*pixelsPerMeter} ${-last.y*pixelsPerMeter}) rotate(${heading})`} fill="#087a80" stroke="white" strokeWidth="2" strokeLinejoin="round"/>)}
         </g>
       })}
     </svg>

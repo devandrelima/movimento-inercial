@@ -24,9 +24,9 @@ async page => {
  await drag([4,4.5],[3,4.5]);near(await field(controls,'X'),3,'aresta esquerda (X)');near(await field(controls,'Largura'),5,'aresta esquerda (largura)');
  await controls.getByLabel('X',{exact:true}).fill('4');await controls.getByLabel('Y',{exact:true}).fill('3');await controls.getByLabel('Largura').fill('2');await controls.getByLabel('Altura').fill('2');
  await drag([8.5,7],[8.6,7.1],2);if(await controls.getByLabel('Largura').count()!==0)throw Error('Clique no vazio não desmarcou o obstáculo');
- await drag([10,4],[12,4]);const grown=await field(dims,'Largura');if(grown<11.95||grown>20)throw Error('aresta direita da sala: '+grown);
+ await drag([10,4],[12,4]);const grown=await field(dims,'Largura');if(grown<11.95||grown>30)throw Error('aresta direita da sala: '+grown);
  await drag([grown,4],[2,4]);near(await field(dims,'Largura'),6,'sala não encolhe além do obstáculo');
- await drag([0,0],[-2,-1]);const gw=await field(dims,'Largura'),gh=await field(dims,'Altura');if(gw<7.95||gw>16||gh<8.95||gh>20)throw Error('canto inferior esquerdo: '+gw+' x '+gh);near(await field(startBox,'X (m)'),gw-5,'início acompanha a origem da sala (X)');near(await field(startBox,'Y (m)'),gh-7,'início acompanha a origem da sala (Y)')
+ await drag([0,0],[-2,-1]);const gw=await field(dims,'Largura'),gh=await field(dims,'Altura');if(gw<7.95||gw>30||gh<8.95||gh>30)throw Error('canto inferior esquerdo: '+gw+' x '+gh);near(await field(startBox,'X (m)'),gw-5,'início acompanha a origem da sala (X)');near(await field(startBox,'Y (m)'),gh-7,'início acompanha a origem da sala (Y)')
  const o=await screen(gw-1,gh-4);await page.mouse.click(o.x,o.y);near(await field(controls,'X'),gw-2,'obstáculo deslocado com a sala');
  await controls.getByLabel('X',{exact:true}).fill('4');await controls.getByLabel('Y',{exact:true}).fill('3');
  await startBox.getByLabel('X (m)').fill('1');await startBox.getByLabel('Y (m)').fill('1');
@@ -54,10 +54,16 @@ async page => {
  const scale=await page.locator('.field').evaluate(e=>parseFloat(getComputedStyle(e).backgroundSize));
  const points=corrected.split(' ').map(v=>{const [x,y]=v.split(',').map(Number);return{x:x/scale+1,y:1-y/scale}});
  for(const p of points)if(p.x<0||p.x>10||p.y<0||p.y>8||(p.x>=4&&p.x<=6&&p.y>=3&&p.y<=5))throw Error('Ponto corrigido fora da área livre: '+JSON.stringify(p));
+ // Seta na ponta da trajetória: posição na última coordenada e giro conforme o último trecho.
+ const arrow=page.locator('.trajectory-layer polygon.trail-arrow');if(await arrow.count()!==1)throw Error('Seta da trajetória não apareceu');
+ {const tip=await page.evaluate(()=>{const pts=document.querySelector('.trajectory-layer polyline').getAttribute('points').split(' ').map(v=>v.split(',').map(Number));const t=document.querySelector('.trajectory-layer polygon.trail-arrow').getAttribute('transform').match(/translate\(([-\d.e]+) ([-\d.e]+)\) rotate\(([-\d.e]+)\)/);return {pts,x:+t[1],y:+t[2],rot:+t[3],scale:parseFloat(getComputedStyle(document.querySelector('.field')).backgroundSize)}});
+  const last=tip.pts[tip.pts.length-1];if(Math.hypot(last[0]-tip.x,last[1]-tip.y)>.6)throw Error('Seta fora da ponta do traço: '+JSON.stringify([last,tip.x,tip.y]));
+  let anchor=tip.pts[0];for(let i=tip.pts.length-2;i>=0;i--){anchor=tip.pts[i];if(Math.hypot(last[0]-anchor[0],last[1]-anchor[1])>=.25*tip.scale)break}
+  const expected=Math.atan2(last[1]-anchor[1],last[0]-anchor[0])*180/Math.PI,diff=Math.abs(((tip.rot-expected+540)%360)-180);if(diff>2)throw Error('Seta apontando para o lado errado: '+tip.rot+' vs '+expected.toFixed(1))}
  if(await page.getByRole('button',{name:'Centralizar'}).count()||await page.getByRole('button',{name:/Ver (trajetória|original|com mapa)/}).count())throw Error('Botões Centralizar e Ver original/Ver com mapa deveriam ter sido removidos');
  await page.getByText('Sem caminho compatível com a sala.',{exact:false}).waitFor();
  for(const size of [{width:320,height:568},{width:568,height:320}]){await page.setViewportSize(size);const issue=await page.evaluate(()=>{const r=document.querySelector('.play').getBoundingClientRect();return document.documentElement.scrollHeight>innerHeight+1||r.bottom>innerHeight+1});if(issue)throw Error('Aviso ou botão fora da tela: '+JSON.stringify(size))}
  const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Baixar trajetórias em CSV'}).click();const download=await downloadPromise;if(download.suggestedFilename()!=='trajetorias.csv')throw Error('Exportação incorreta');const stream=await download.createReadStream();let csv='';for await(const chunk of stream)csv+=chunk.toString();if(!csv.includes('x_original_m')||!csv.includes('x_mapa_m')||!csv.split('\n').some(row=>row.endsWith(',,')))throw Error('CSV não preserva originais e falhas');
  await page.getByRole('button',{name:'Editar sala'}).click();await page.getByText('Para editar a sala, primeiro reinicie a sessão.').waitFor();
- return {sala:saved.width+' x '+saved.height,obstaculos:saved.obstacles.length,pontosCorrigidos:points.length,botoesRemovidos:'ok',csv:download.suggestedFilename(),validacao:'origem em obstáculo rejeitada',persistencia:'após recarga',mobile:'ok'};
+ return {sala:saved.width+' x '+saved.height,obstaculos:saved.obstacles.length,pontosCorrigidos:points.length,botoesRemovidos:'ok',seta:'na ponta e alinhada ao último trecho',csv:download.suggestedFilename(),validacao:'origem em obstáculo rejeitada',persistencia:'após recarga',mobile:'ok'};
 }

@@ -22,7 +22,7 @@ Para reproduzir o build e os testes: `npm ci`, `npm run build`, `npx vitest run`
 
 O mapa define a frente de cada trecho a partir do primeiro deslocamento estimado cuja distância à origem alcança 0,75 m. Essa direção é exibida para cima; a transformação é uma rotação rígida que preserva distâncias e giros à direita e à esquerda. Antes disso, a linha fica oculta e a interface solicita uma caminhada inicial reta. O trecho inicial de aproximadamente 2,5 s continua sem estimativa pelo modelo. A orientação depende da previsão, portanto ruído, desvios ou movimento insuficiente podem atrasar ou desalinhar a calibração; não é uma medição direta da orientação do usuário. A mesma direção inicial é mantida após pausas e lacunas; movimentos durante elas não são observados.
 
-Botões, roda do mouse e pinça alteram a escala visual; uma quadrícula continua representando 1 m × 1 m em qualquer zoom. O reset restaura o zoom e a centralização; não há botão para recentralizar durante o uso.
+Botões, roda do mouse e pinça alteram a escala visual; uma quadrícula continua representando 1 m × 1 m em qualquer zoom. A ponta da trajetória é uma seta que aponta para o rumo atual (a corda entre a posição atual e a de pelo menos 25 cm antes, para suavizar o ruído; parada, mantém o último rumo; sem deslocamento suficiente, aparece um ponto) e é ela que se move pela grade deixando o traço para trás. O reset restaura o zoom e a centralização; não há botão para recentralizar durante o uso.
 
 ## Verificação inicial de compatibilidade
 
