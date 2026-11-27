@@ -26,9 +26,13 @@ Botões, roda do mouse e pinça alteram a escala visual; uma quadrícula continu
 
 ## Verificação inicial de compatibilidade
 
-Antes de iniciar, o usuário autoriza os sensores e movimenta o aparelho durante cinco segundos. A verificação exige leituras completas de acelerômetro com gravidade, giroscópio e orientação, além de pelo menos 50 Hz de eventos completos de movimento durante o intervalo. Sensores ausentes, permissão negada ou frequência insuficiente são informados, com opção de repetir o teste. Uma aprovação indica disponibilidade durante aquela amostra, não garante precisão ou disponibilidade contínua.
+Antes de iniciar, o usuário autoriza os sensores e movimenta o aparelho durante três segundos. A verificação exige leituras completas de acelerômetro com gravidade, giroscópio e orientação, além de pelo menos 50 Hz de eventos completos de movimento durante o intervalo. Sensores ausentes, permissão negada ou frequência insuficiente são informados, com opção de repetir o teste ou de abrir os mapas sem sensores (veja abaixo). Uma aprovação indica disponibilidade durante aquela amostra, não garante precisão ou disponibilidade contínua.
 
 Depois que o usuário toca em Iniciar, a página mostra o carregamento real do modelo e só abre o mapa quando o carregamento e o teste de compatibilidade do modelo terminam. Em caso de erro, é possível tentar novamente. A aquisição de rastreamento começa apenas ao tocar em play na tela do mapa.
+
+### Aparelho que não passa no teste
+
+Se o teste falhar, além de tentar de novo é possível abrir a tela do mapa sem sensores. Nesse modo o modelo não é carregado nem baixado, os botões de play e de reset ficam desabilitados e, ao tocá-los, a página informa que o aparelho não consegue rodar o modelo. Criar, editar e carregar mapas (inclusive os públicos) continua funcionando normalmente.
 
 A barra de carregamento representa etapas do preparo: início do mecanismo, download do arquivo do modelo, verificação do hash, compilação e teste de inferência. O download usa o tamanho informado pelo servidor para mostrar progresso dos bytes quando disponível; sem esse tamanho, a barra avança quando o download termina. Os percentuais são pesos dessas etapas, não uma estimativa do tempo restante. A barra só atinge 100% após o teste de inferência passar.
 

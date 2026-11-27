@@ -6,7 +6,8 @@ A aplicação publicada está em [embarcado.bemaqui.online](https://embarcado.be
 
 ## Funcionalidades
 
-- Teste de compatibilidade dos sensores e permissões antes do uso.
+- Teste de compatibilidade dos sensores e permissões antes do uso (3 segundos). Se o aparelho não passar, ainda é possível abrir o mapa, com play e reset desabilitados, para criar, editar e carregar mapas.
+- Mapas públicos: qualquer pessoa carrega os mapas da lista; publicar, atualizar e excluir exigem login. Veja [mapas públicos](docs/mapas-publicos.md).
 - Leitura de aceleração com gravidade, giroscópio e orientação; aquisição e inferência locais, sem GPS ou câmera.
 - Pré-processamento a 50 Hz e inferência com o modelo RoNIN v2 float32 no navegador, usando LiteRT.js e WebAssembly.
 - Trajetória em grade métrica com zoom, arraste, início, pausa, reset e exportação das leituras em CSV.
@@ -29,7 +30,7 @@ O Compose utiliza uma rede Docker externa chamada `automacao-net`, usada pelo pr
 
 ```bash
 docker network inspect automacao-net >/dev/null 2>&1 || docker network create automacao-net
-cp .env.example .env
+cp .env.example .env   # defina SEED_USER e SEED_PASSWORD para o usuário inicial dos mapas públicos
 docker compose build
 docker compose up -d
 docker compose ps
@@ -42,7 +43,7 @@ docker compose logs -f
 docker compose down
 ```
 
-`docker compose down` encerra os serviços deste projeto; a rede externa e serviços de outros projetos são preservados. Os arquivos do dataset não entram na imagem.
+`docker compose down` encerra os serviços deste projeto; a rede externa e serviços de outros projetos são preservados. Os mapas públicos ficam no volume `maps-data`, que `down` preserva; **não use `docker compose down -v`**, que o apagaria. Os arquivos do dataset não entram na imagem.
 
 ## Testes e desenvolvimento
 

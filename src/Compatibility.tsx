@@ -3,18 +3,20 @@ import {sensorPermissions} from './sensors'
 import {SensorCheck} from './sensor-check'
 import './Compatibility.css'
 
+/** Duração do teste de sensores, em segundos. */
+export const TEST_SECONDS=3
 type State='idle'|'permission'|'testing'|'success'|'failure'
 function PhoneIllustration({moving}:{moving:boolean}) {
  return <div className={`phone-art${moving?' is-moving':''}`} aria-hidden="true">
   <img className="phone-art-device" src="/bussola.png" alt="" width="512" height="512"/>
  </div>
 }
-export default function Compatibility({onStart}:{onStart:()=>void}) {
- const [state,setState]=useState<State>('idle'),[remaining,setRemaining]=useState(5),[failure,setFailure]=useState('')
+export default function Compatibility({onStart,onSkip}:{onStart:()=>void;onSkip:()=>void}) {
+ const [state,setState]=useState<State>('idle'),[remaining,setRemaining]=useState(TEST_SECONDS),[failure,setFailure]=useState('')
  const cleanup=useRef<()=>void>(()=>{}),token=useRef(0)
  useEffect(()=>()=>{token.current++;cleanup.current()},[])
  async function startTest() {
-  cleanup.current();const run=++token.current;setState('permission');setFailure('');setRemaining(5)
+  cleanup.current();const run=++token.current;setState('permission');setFailure('');setRemaining(TEST_SECONDS)
   const permission=await sensorPermissions()
   if(run!==token.current)return
   if(permission.motion!=='granted' || permission.orientation!=='granted') {
@@ -27,7 +29,7 @@ export default function Compatibility({onStart}:{onStart:()=>void}) {
   const orientation=(event:DeviceOrientationEvent)=>check.orientationEvent(event,performance.now())
   window.addEventListener('devicemotion',motion);window.addEventListener('deviceorientation',orientation)
   const timer=window.setInterval(()=>{
-   const left=Math.max(0,Math.ceil((5000-(performance.now()-start))/1000));setRemaining(left)
+   const left=Math.max(0,Math.ceil((TEST_SECONDS*1000-(performance.now()-start))/1000));setRemaining(left)
    if(left>0)return
    cleanup.current();const result=check.result()
    if(result.compatible)setState('success')
@@ -40,13 +42,14 @@ export default function Compatibility({onStart}:{onStart:()=>void}) {
   <div className="compat-content"><PhoneIllustration moving={state==='testing'}/>
    <div className="compat-copy">
     <h1>Teste se seu dispositivo é compatível</h1>
-    {state==='idle' && <p className="compat-description">Toque para começar e balance seu celular por 5 segundos.</p>}
+    {state==='idle' && <p className="compat-description">Toque para começar e balance seu celular por {TEST_SECONDS} segundos.</p>}
     {state==='permission' && <p className="compat-description" role="status">Verificando as permissões do navegador…</p>}
-    {state==='testing' && <><p className="compat-description">Balance seu celular por 5 segundos.</p><div className="compat-progress" role="progressbar" aria-label="Tempo restante do teste" aria-valuemin={0} aria-valuemax={5} aria-valuenow={5-remaining}><div style={{width:`${(5-remaining)*20}%`}}/></div><p className="compat-timer" aria-live="off">{remaining}<span> s</span></p></>}
+    {state==='testing' && <><p className="compat-description">Balance seu celular por {TEST_SECONDS} segundos.</p><div className="compat-progress" role="progressbar" aria-label="Tempo restante do teste" aria-valuemin={0} aria-valuemax={TEST_SECONDS} aria-valuenow={TEST_SECONDS-remaining}><div style={{width:`${(TEST_SECONDS-remaining)*100/TEST_SECONDS}%`}}/></div><p className="compat-timer" aria-live="off">{remaining}<span> s</span></p></>}
     {state==='success' && <p className="compat-result" role="status"><span aria-hidden="true">✓</span> Sensores disponíveis</p>}
     {state==='failure' && <p className="compat-error" role="alert">{failure}</p>}
     {(state==='idle'||state==='failure') && <button className="compat-primary" onClick={startTest}>{state==='idle'?'Testar sensores':'Tentar novamente'}<span aria-hidden="true">→</span></button>}
     {state==='success' && <button className="compat-primary" onClick={onStart}>Iniciar <span aria-hidden="true">→</span></button>}
+    {state==='failure' && <><p className="compat-fallback">Você ainda pode abrir os mapas para criar, editar e carregar mapas públicos, mas a trajetória não funcionará neste aparelho.</p><button className="compat-secondary" onClick={onSkip}>Abrir os mapas sem sensores</button></>}
    </div>
   </div>
  </div></main>

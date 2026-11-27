@@ -1,0 +1,7 @@
+{
+  "name": "norte-maps-api",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "API dos mapas públicos do Movimento inercial (sem dependências externas)"
+}

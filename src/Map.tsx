@@ -9,7 +9,7 @@ type Gesture = {scale:number;offset:Point;center:Point;distance:number}
 const MIN_SCALE=12,MAX_SCALE=192,INITIAL_SCALE=48
 const clamp=(value:number)=>Math.max(MIN_SCALE,Math.min(MAX_SCALE,value))
 
-export default function Map({ resetKey, segments, room, matched, onEditRoom, locked }: { resetKey:number;segments:Segment[];room:Room|null;matched:MatchedPath|null;onEditRoom:()=>void;locked:boolean }) {
+export default function Map({ resetKey, segments, room, matched, onEditRoom, onOpenMaps, locked, limited=false }: { resetKey:number;segments:Segment[];room:Room|null;matched:MatchedPath|null;onEditRoom:()=>void;onOpenMaps:()=>void;locked:boolean;limited?:boolean }) {
   const map = useRef<HTMLElement>(null)
   const offset = useRef<Point>({x:0,y:0})
   const scale = useRef(INITIAL_SCALE)
@@ -18,7 +18,7 @@ export default function Map({ resetKey, segments, room, matched, onEditRoom, loc
   const [panned,setPanned]=useState(false)
   const [pixelsPerMeter,setPixelsPerMeter]=useState(INITIAL_SCALE)
   const [view,setView]=useState<'corrected'|'raw'>('corrected')
-  const [notice,setNotice]=useState(false)
+  const [notice,setNotice]=useState<'edit'|'maps'|null>(null)
   const aligned=room ? [{id:1,points:(view==='raw'?matched?.raw:matched?.corrected)?.map(p=>({x:p.x-room.start.x,y:p.y-room.start.y}))??null}] : segments.map(segment=>({id:segment.id,points:alignForward(segment.points)}))
   const awaiting=segments.length===0 || aligned[aligned.length-1].points===null || aligned[aligned.length-1].points?.length===0
   function exportPaths() {
@@ -49,7 +49,7 @@ export default function Map({ resetKey, segments, room, matched, onEditRoom, loc
     element.addEventListener('wheel',wheel,{passive:false})
     return ()=>element.removeEventListener('wheel',wheel)
   },[])
-  useEffect(()=>{pointers.current.clear();gesture.current=null;moveTo({x:0,y:0});scale.current=INITIAL_SCALE;setPixelsPerMeter(INITIAL_SCALE);setNotice(false)},[resetKey])
+  useEffect(()=>{pointers.current.clear();gesture.current=null;moveTo({x:0,y:0});scale.current=INITIAL_SCALE;setPixelsPerMeter(INITIAL_SCALE);setNotice(null)},[resetKey])
   function beginGesture() {
     const points=[...pointers.current.values()]
     if(!points.length){gesture.current=null;return}
@@ -86,7 +86,8 @@ export default function Map({ resetKey, segments, room, matched, onEditRoom, loc
   return <section ref={map} className="field" style={{'--grid-size':`${pixelsPerMeter}px`,'--grid-half':`${pixelsPerMeter/2}px`} as React.CSSProperties} role="region" tabIndex={0} aria-label="Plano de trajetória. Arraste para navegar; use os botões ou gesto de pinça para ajustar o zoom." onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end} onKeyDown={keyboard}>
     <div className="field-top"><span>Plano de trajetória</span><span>Grade: 1 m × 1 m</span></div>
     <div className="room-map-actions" onPointerDown={event=>event.stopPropagation()}>
-      <button onClick={()=>{if(locked){setNotice(true);return}setNotice(false);onEditRoom()}}>{room?'Editar sala':'Criar sala'}</button>
+      <button onClick={()=>{if(locked){setNotice('edit');return}setNotice(null);onEditRoom()}}>{room?'Editar sala':'Criar sala'}</button>
+      <button onClick={()=>{if(locked){setNotice('maps');return}setNotice(null);onOpenMaps()}}>Mapas públicos</button>
       {room && <button onClick={()=>setView(value=>value==='corrected'?'raw':'corrected')} aria-label={view==='corrected'?'Ver trajetória original':'Ver trajetória com mapa'}>{view==='corrected'?'Ver original':'Ver com mapa'}</button>}
       {room && matched?.raw.length ? <button onClick={exportPaths} aria-label="Baixar trajetórias em CSV">CSV</button> : null}
     </div>
@@ -110,6 +111,6 @@ export default function Map({ resetKey, segments, room, matched, onEditRoom, loc
     </svg>
     <div className="crosshair"><div className="origin"/><span>Origem</span></div>
     <div className="field-foot"><span>X →</span><span>Y ↑</span></div>
-    {(notice||awaiting) && <p className="model-note">{notice?'Para editar a sala, primeiro reinicie a sessão.':room?'Ao iniciar, caminhe em linha reta na direção da seta.':'Ao iniciar, caminhe em linha reta para definir a frente.'}</p>}
+    {(notice||(awaiting&&!limited)) && <p className="model-note">{notice==='edit'?'Para editar a sala, primeiro reinicie a sessão.':notice==='maps'?'Para trocar o mapa, primeiro reinicie a sessão.':room?'Ao iniciar, caminhe em linha reta na direção da seta.':'Ao iniciar, caminhe em linha reta para definir a frente.'}</p>}
   </section>
 }

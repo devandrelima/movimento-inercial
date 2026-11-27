@@ -3,9 +3,12 @@ import {flushSync} from 'react-dom'
 import {DEFAULT_ROOM,insideObstacle,validRoom,type Heading,type Room,type Obstacle} from './room'
 import type {Point} from './tracker'
 import {coversPoint,fitView,growView,resizeRect,resizeRoom,VIEW_PAD,type HandleDir,type Rect,type View} from './room-edit'
+import {useAuth} from './auth-ui'
+import PublishDialog from './PublishDialog'
+import type {RoomLink} from './room-link'
 import './RoomEditor.css'
 
-type Props={initial:Room|null;onSave:(room:Room|null)=>void;onCancel:()=>void}
+type Props={initial:Room|null;link:RoomLink|null;onSave:(room:Room|null)=>void;onPublished:(room:Room,link:RoomLink)=>void;onUnlinked:()=>void;onCancel:()=>void}
 const round=(n:number)=>Math.round(n*100)/100
 const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(max,n))
 function NumberField({label,value,onChange}:{label:string;value:number;onChange:(value:number)=>void}) {
@@ -35,11 +38,12 @@ function Handles({rect,target,ppu}:{rect:Rect;target:string;ppu:number}) {
   })}
  </g>
 }
-export default function RoomEditor({initial,onSave,onCancel}:Props) {
+export default function RoomEditor({initial,link,onSave,onPublished,onUnlinked,onCancel}:Props) {
  const [room,setRoom]=useState<Room>(()=>initial?structuredClone(initial):structuredClone(DEFAULT_ROOM))
  const [selected,setSelected]=useState<string|null>(null),[positionMode,setPositionMode]=useState(false),[attempted,setAttempted]=useState(false)
  const [frame,setFrame]=useState<Frame|null>(null),[ppu,setPpu]=useState(40),[dragging,setDragging]=useState<Gesture['kind']|null>(null)
- const [box,setBox]=useState({w:600,h:400})
+ const [box,setBox]=useState({w:600,h:400}),[publishing,setPublishing]=useState(false)
+ const auth=useAuth()
  const svg=useRef<SVGSVGElement>(null),drag=useRef<Gesture|null>(null),frameRef=useRef<Frame|null>(null),pointerRef=useRef<Point|null>(null),lastRoom=useRef<Room|null>(null),lastKey=useRef(''),loop=useRef(0),tween=useRef(0),lastTick=useRef(0)
  const object=room.obstacles.find(o=>o.id===selected)
  const safeWidth=Number.isFinite(room.width)&&room.width>=1?Math.min(room.width,30):8
@@ -154,11 +158,16 @@ export default function RoomEditor({initial,onSave,onCancel}:Props) {
  }
  const u=(px:number)=>px/ppu,tx=view.sx,ty=-view.sy
  const roomActive=!object&&!positionMode
+ async function startPublish(){
+  // O login é pedido antes de abrir a janela de publicação.
+  const ok=await auth.run('Para publicar um mapa é preciso entrar com usuário e senha.',async()=>true)
+  if(ok)setPublishing(true)
+ }
  function save(){setAttempted(true);if(validRoom(room))onSave(room)}
  return <div className="room-page" role="main"><div className="room-editor">
   <header className="room-header"><div><span className="room-kicker">AMBIENTE</span><h1>Editor de sala</h1></div><div className="room-header-actions"><button className="room-ghost" onClick={onCancel}>Cancelar</button><button className="room-save" onClick={save}>Salvar sala</button></div></header>
   <div className="room-layout"><section className="room-canvas-panel" aria-label="Planta da sala">
-   <div className="room-canvas-title"><span style={{whiteSpace:"nowrap"}}>Planta em metros</span><span>Arraste cantos e bordas para redimensionar · ● para mudar o início</span></div>
+   <div className="room-canvas-title"><span style={{whiteSpace:"nowrap"}}>Planta em metros</span><span className="room-canvas-hint">Arraste cantos e bordas para redimensionar · ● para mudar o início</span><button className="room-link room-publish" onClick={startPublish}>Publicar…</button></div>
    <div className="room-canvas-wrap"><svg ref={svg} className="room-canvas" viewBox={`${view.x} ${-(view.y+view.h)} ${view.w} ${view.h}`} preserveAspectRatio="xMidYMid meet" onPointerDown={down} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end} role="img" aria-label="Planta da sala com obstáculos e posição inicial">
     <defs><pattern id="room-grid" width="1" height="1" patternUnits="userSpaceOnUse"><path d="M 1 0 L 0 0 0 1" fill="none" stroke="#dbe8e6" strokeWidth=".025"/></pattern></defs>
     <g transform={`translate(${tx} ${ty})`}>
@@ -179,5 +188,7 @@ export default function RoomEditor({initial,onSave,onCancel}:Props) {
     {object ? <><div className="room-fields four"><NumberField label="X" value={object.x} onChange={x=>updateObstacle(object.id,{x})}/><NumberField label="Y" value={object.y} onChange={y=>updateObstacle(object.id,{y})}/><NumberField label="Largura" value={object.width} onChange={width=>updateObstacle(object.id,{width})}/><NumberField label="Altura" value={object.height} onChange={height=>updateObstacle(object.id,{height})}/></div><button className="room-delete" onClick={()=>{setRoom(r=>({...r,obstacles:r.obstacles.filter(o=>o.id!==object.id)}));setSelected(null)}}>Remover selecionado</button></> : <p className="room-empty">{room.obstacles.length?'Selecione um obstáculo na planta.':'Adicione mesas, armários ou outros obstáculos fixos.'}</p>}
    </div>
   </aside></div>
+ {publishing&&<PublishDialog room={room} link={link} auth={auth} onPublished={map=>onPublished(room,{id:map.id,name:map.name})} onDeleted={()=>{setPublishing(false);onUnlinked()}} onClose={()=>setPublishing(false)}/>}
+ {auth.dialog}
  </div></div>
 }

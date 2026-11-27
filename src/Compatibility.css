@@ -32,3 +32,11 @@
   .compat-primary{margin-top:14px;min-height:46px}.compat-progress{margin-top:12px}.compat-timer{font-size:25px;margin-top:5px}.compat-result,.compat-error{margin-top:10px}
   .loading-content h1{font-size:28px}.loading-symbol{width:58px;height:58px}.model-loading-progress{margin-top:15px}
 }
+
+.compat-fallback{font-size:13px;line-height:1.55;color:#668087;margin:22px 0 0;max-width:390px}
+.compat-secondary{border:1px solid #b9d0cf;cursor:pointer;margin-top:12px;min-height:48px;padding:0 18px;background:#fff;color:#126c70;border-radius:6px;font-weight:700;font-size:14px}
+.compat-secondary:hover{background:#eef6f5}
+@media(max-width:767px){.compat-secondary{width:100%}}
+@media(max-height:660px){.compat-fallback{display:none}.compat-secondary{margin-top:10px}}
+@media(max-width:700px){.compat-fallback{font-size:12px;line-height:1.45;margin-top:16px}}
+@media(orientation:landscape) and (max-height:600px){.compat-secondary{min-height:42px;margin-top:8px}}

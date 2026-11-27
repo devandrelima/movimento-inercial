@@ -2,9 +2,13 @@ services:
   web:
     build: .
     restart: unless-stopped
+    depends_on:
+      norte-api:
+        condition: service_healthy
     networks:
       proxy:
         aliases: [norte-inercial-web]
+      internal: {}
     ports:
       - "127.0.0.1:${WEB_PORT:-8197}:8080"
     cap_drop: [ALL]
@@ -17,7 +21,37 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # API dos mapas públicos: só existe na rede interna deste projeto, nunca na rede compartilhada
+  # automacao-net, e não publica portas. O Nginx do serviço `web` a alcança por /api.
+  norte-api:
+    build: ./server
+    restart: unless-stopped
+    networks:
+      internal:
+        aliases: [norte-inercial-api]
+    environment:
+      # Usuário inicial: criado só se ainda não houver usuários. Defina no .env (fora do Git).
+      SEED_USER: ${SEED_USER:-}
+      SEED_PASSWORD: ${SEED_PASSWORD:-}
+    volumes:
+      - maps-data:/data
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    cpus: 0.25
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  maps-data: {}
+
 networks:
+  internal: {}
   proxy:
     external: true
     name: automacao-net

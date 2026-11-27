@@ -10,13 +10,17 @@ import {Tracker,type Segment} from './tracker'
 import {loadRoom,ROOM_STORAGE_KEY,type Room} from './room'
 import {RoomPath,type MatchedPath} from './map-match'
 import RoomEditor from './RoomEditor'
+import PublicMaps from './PublicMaps'
+import {loadLink,saveLink,type RoomLink} from './room-link'
+import type {PublicMap} from './api'
 
 const format = (n: number | null | undefined) => n == null ? '—' : n.toFixed(2)
 function Readings({ label, unit, values, labels = ['X','Y','Z'] }: { label: string; unit: string; values?: PartialVector; labels?: string[] }) {
   return <section className="reading"><div className="reading-title"><h2>{label}</h2><span>{unit}</span></div><div className="axes">{(['x', 'y', 'z'] as const).map((axis, index) => <div key={axis}><small>{labels[index]}</small><strong>{format(values?.[axis])}</strong></div>)}</div></section>
 }
 const LIMIT = 36000
-function App({onModelReady,onModelError,onModelProgress}:{onModelReady:()=>void;onModelError:(message:string)=>void;onModelProgress:(value:number)=>void}) {
+const LIMITED_MESSAGE='Este aparelho não consegue rodar o modelo de trajetória. Você ainda pode criar, editar e carregar mapas.'
+function App({limited=false,onModelReady,onModelError,onModelProgress}:{limited?:boolean;onModelReady:()=>void;onModelError:(message:string)=>void;onModelProgress:(value:number)=>void}) {
   const [sample, setSample] = useState<PartialSample>()
   const [orientation, setOrientation] = useState<OrientationSample>()
   const [orientationStatus, setOrientationStatus] = useState('Aguardando início')
@@ -39,7 +43,10 @@ function App({onModelReady,onModelError,onModelProgress}:{onModelReady:()=>void;
   const roomPath=useRef<RoomPath|null>(null)
   const [matched,setMatched]=useState<MatchedPath|null>(null)
   const [editingRoom,setEditingRoom]=useState(false)
+  const [showMaps,setShowMaps]=useState(false)
+  const [link,setLink]=useState<RoomLink|null>(loadLink)
   const [roomStorageWarning,setRoomStorageWarning]=useState(false)
+  const [limitedNotice,setLimitedNotice]=useState(false)
   const [positionGap,setPositionGap] = useState(false)
   const [modelStatus,setModelStatus] = useState('Carregando IA v2 experimental…')
   const modelReady = useRef(false)
@@ -61,6 +68,7 @@ function App({onModelReady,onModelError,onModelProgress}:{onModelReady:()=>void;
     message=>{preprocessor.current.reset();latestWindow.current=null;setPositionGap(true);setModelStatus(`IA interrompida: ${message}`)},
   )
   useEffect(()=>{
+    if(limited){setModelStatus('IA indisponível neste aparelho');return}
     let mounted=true
     let client:ModelClient
     try {client=new ModelClient();model.current=client}
@@ -72,7 +80,7 @@ function App({onModelReady,onModelError,onModelProgress}:{onModelReady:()=>void;
       onModelReady()
     }).catch(error=>{if (mounted) {modelReady.current=false;const message=error instanceof Error ? error.message : 'Falha ao carregar o modelo';setModelStatus(`IA indisponível: ${message}`);onModelError(message)}})
     return ()=>{mounted=false;modelReady.current=false;tracker.current?.pause();client.dispose();if (model.current===client)model.current=null}
-  },[onModelReady,onModelError,onModelProgress])
+  },[limited,onModelReady,onModelError,onModelProgress])
   useEffect(() => {
     const onMotion = (event: DeviceMotionEvent) => {
       if (!active.current) return
@@ -167,9 +175,15 @@ function App({onModelReady,onModelError,onModelProgress}:{onModelReady:()=>void;
   }
   function saveRoom(next:Room|null) {
     roomRef.current=next;setRoom(next);roomPath.current=null;setMatched(null);setEditingRoom(false)
+    if(!next){setLink(null);saveLink(null)}
     try {if(next)localStorage.setItem(ROOM_STORAGE_KEY,JSON.stringify(next));else localStorage.removeItem(ROOM_STORAGE_KEY);setRoomStorageWarning(false)} catch {setRoomStorageWarning(true)}
   }
-  if(editingRoom)return <RoomEditor initial={room} onSave={saveRoom} onCancel={()=>setEditingRoom(false)}/>
-  return <div className="shell"><main><Map resetKey={mapReset} segments={segments} room={room} matched={matched} locked={started.current} onEditRoom={()=>setEditingRoom(true)}/><section className="instrument" aria-label="Leituras dos sensores"><div className="instrument-head"><h2>Leituras ao vivo</h2></div><div className="readings"><Readings label="Aceleração com gravidade" unit="m/s²" values={sample?.acceleration}/><Readings label="Giroscópio" unit="rad/s" values={sample?.rotation}/><Readings label="Orientação" unit="graus" labels={['α','β','γ']} values={orientation ? {x:orientation.alpha,y:orientation.beta,z:orientation.gamma} : undefined}/></div><div role="status" aria-live="polite">{['Permissão de orientação negada','Orientação indisponível','Nenhuma orientação recebida','Orientação sem valores','Referência de orientação alterada'].includes(orientationStatus) && <p className="orientation-status">{orientationStatus}</p>}{['Permissão negada','Sensores indisponíveis ou conexão insegura','Sensores indisponíveis','Giroscópio indisponível','Acelerômetro indisponível','Nenhuma leitura de movimento','Leituras de movimento interrompidas','Limite de gravação atingido','Limite atingido. Exporte ou reinicie a coleta.'].includes(status) && <p className="sensor-status">{status}</p>}</div>{running && ['low-rate','gap','missing'].includes(preprocessState) && <p className="processing-status" role="status">{preprocessState === 'low-rate' ? 'Frequência insuficiente para o modelo' : preprocessState === 'gap' ? 'Leituras interrompidas; aguardando sensores' : 'Dados incompletos dos sensores'}</p>}{(modelStatus.includes('estimando trajetória') || modelStatus.startsWith('IA interrompida') || modelStatus.startsWith('IA pausada') || modelStatus.startsWith('IA indisponível')) && <p className="model-status" role="status">{modelStatus.includes('estimando trajetória') ? 'Estimando trajetória' : modelStatus}</p>}{matched?.lost && <p className="hint" role="alert">Sem caminho compatível com a sala. A correção foi interrompida; consulte a trajetória original.</p>}{roomStorageWarning && <p className="hint">Não foi possível salvar a sala no dispositivo; ela ficará disponível apenas nesta página.</p>}{positionGap && <p className="hint">Movimentos durante pausas ou falhas não são estimados.</p>}<div className="controls"><button className="reset" onClick={() => setConfirmReset(true)} aria-label="Resetar dados">↺ <span>Resetar</span></button><button className="download" onClick={download} disabled={count === 0}>Baixar CSV</button><button className="play" onClick={toggle} disabled={requesting} aria-label={running ? 'Pausar coleta' : started.current ? 'Retomar coleta' : 'Iniciar coleta'}>{running ? <span aria-hidden="true">Ⅱ</span> : <span aria-hidden="true">▶</span>}</button></div>{limitReached && <p className="hint">Limite de gravação atingido. Baixe o CSV antes de resetar.</p>}</section></main><dialog ref={dialog} onClose={() => setConfirmReset(false)} onCancel={() => setConfirmReset(false)}><h2>Resetar dados?</h2><p>Os dados coletados e a trajetória serão apagados. Esta ação não pode ser desfeita.</p><div className="dialog-actions"><button className="secondary" onClick={() => {dialog.current?.close(); setConfirmReset(false)}}>Cancelar</button><button className="confirm" onClick={reset}>Resetar</button></div></dialog></div>
+  function changeLink(next:RoomLink|null){setLink(next);saveLink(next)}
+  function usePublicMap(map:PublicMap,edit:boolean) {
+    saveRoom(map.room);changeLink({id:map.id,name:map.name});setShowMaps(false);if(edit)setEditingRoom(true)
+  }
+  if(editingRoom)return <RoomEditor initial={room} link={link} onSave={saveRoom} onPublished={(published,next)=>{saveRoom(published);changeLink(next)}} onUnlinked={()=>changeLink(null)} onCancel={()=>setEditingRoom(false)}/>
+  if(showMaps)return <PublicMaps link={link} onUse={usePublicMap} onUnlink={id=>{if(link?.id===id)changeLink(null)}} onClose={()=>setShowMaps(false)}/>
+  return <div className="shell"><main><Map resetKey={mapReset} segments={segments} room={room} matched={matched} locked={started.current} limited={limited} onEditRoom={()=>setEditingRoom(true)} onOpenMaps={()=>setShowMaps(true)}/><section className="instrument" aria-label="Leituras dos sensores"><div className="instrument-head"><h2>Leituras ao vivo</h2></div><div className="readings"><Readings label="Aceleração com gravidade" unit="m/s²" values={sample?.acceleration}/><Readings label="Giroscópio" unit="rad/s" values={sample?.rotation}/><Readings label="Orientação" unit="graus" labels={['α','β','γ']} values={orientation ? {x:orientation.alpha,y:orientation.beta,z:orientation.gamma} : undefined}/></div><div role="status" aria-live="polite">{['Permissão de orientação negada','Orientação indisponível','Nenhuma orientação recebida','Orientação sem valores','Referência de orientação alterada'].includes(orientationStatus) && <p className="orientation-status">{orientationStatus}</p>}{['Permissão negada','Sensores indisponíveis ou conexão insegura','Sensores indisponíveis','Giroscópio indisponível','Acelerômetro indisponível','Nenhuma leitura de movimento','Leituras de movimento interrompidas','Limite de gravação atingido','Limite atingido. Exporte ou reinicie a coleta.'].includes(status) && <p className="sensor-status">{status}</p>}</div>{running && ['low-rate','gap','missing'].includes(preprocessState) && <p className="processing-status" role="status">{preprocessState === 'low-rate' ? 'Frequência insuficiente para o modelo' : preprocessState === 'gap' ? 'Leituras interrompidas; aguardando sensores' : 'Dados incompletos dos sensores'}</p>}{limitedNotice && <p className="hint limited-notice" role="alert">{LIMITED_MESSAGE}</p>}{(modelStatus.includes('estimando trajetória') || modelStatus.startsWith('IA interrompida') || modelStatus.startsWith('IA pausada') || modelStatus.startsWith('IA indisponível')) && <p className="model-status" role="status">{modelStatus.includes('estimando trajetória') ? 'Estimando trajetória' : modelStatus}</p>}{matched?.lost && <p className="hint" role="alert">Sem caminho compatível com a sala. A correção foi interrompida; consulte a trajetória original.</p>}{roomStorageWarning && <p className="hint">Não foi possível salvar a sala no dispositivo; ela ficará disponível apenas nesta página.</p>}{positionGap && <p className="hint">Movimentos durante pausas ou falhas não são estimados.</p>}<div className="controls"><button className="reset" aria-disabled={limited||undefined} onClick={() => limited ? setLimitedNotice(true) : setConfirmReset(true)} aria-label="Resetar dados">↺ <span>Resetar</span></button><button className="download" onClick={download} disabled={count === 0}>Baixar CSV</button><button className="play" aria-disabled={limited||undefined} onClick={limited ? () => setLimitedNotice(true) : toggle} disabled={!limited&&requesting} aria-label={running ? 'Pausar coleta' : started.current ? 'Retomar coleta' : 'Iniciar coleta'}>{running ? <span aria-hidden="true">Ⅱ</span> : <span aria-hidden="true">▶</span>}</button></div>{limitReached && <p className="hint">Limite de gravação atingido. Baixe o CSV antes de resetar.</p>}</section></main><dialog ref={dialog} onClose={() => setConfirmReset(false)} onCancel={() => setConfirmReset(false)}><h2>Resetar dados?</h2><p>Os dados coletados e a trajetória serão apagados. Esta ação não pode ser desfeita.</p><div className="dialog-actions"><button className="secondary" onClick={() => {dialog.current?.close(); setConfirmReset(false)}}>Cancelar</button><button className="confirm" onClick={reset}>Resetar</button></div></dialog></div>
 }
 export default App
