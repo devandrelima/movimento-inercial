@@ -1,6 +1,6 @@
 import {describe,expect,it} from 'vitest'
 import {DEFAULT_ROOM,validRoom,type Room} from './room'
-import {coversPoint,fitView,growView,handleZones,hitTest,resizeRect,resizeRoom} from './room-edit'
+import {angleFromPoint,coversPoint,fitView,growView,handleZones,hitTest,resizeRect,resizeRoom,startGeometry} from './room-edit'
 
 const limits={minX:0,minY:0,maxX:10,maxY:8}
 const rect={x:4,y:3,width:2,height:2}
@@ -153,5 +153,40 @@ describe('alvo de um toque no editor',()=>{
  it('as zonas colocam canto antes de aresta',()=>{
   const z=handleZones({x:0,y:0,width:4,height:2},0.3,0.2);expect(z.slice(0,4).map(v=>v.dir)).toEqual(['ne','nw','se','sw'])
   expect(z.find(v=>v.dir==='e')).toMatchObject({x0:3.8,x1:4.3,y0:0.2,y1:1.8})
+ })
+})
+
+describe('controle de rotação da seta',()=>{
+ const base:Room={...DEFAULT_ROOM,width:10,height:8,start:{x:5,y:4},heading:'up',obstacles:[]}
+ const ppu=40,geo=startGeometry(ppu),ring=geo.ring/ppu
+ const hit=(r:Room,x:number,y:number,o:Partial<Parameters<typeof hitTest>[2]>={})=>hitTest(r,{x,y},{ppu,selectedId:null,roomActive:true,...o})
+ it('calcula o ângulo do ponteiro (0° = cima, horário) e gruda de 15° em 15° quando está perto',()=>{
+  const c={x:5,y:4}
+  expect(angleFromPoint(c,{x:5,y:6})).toBe(0);expect(angleFromPoint(c,{x:7,y:4})).toBe(90);expect(angleFromPoint(c,{x:5,y:2})).toBe(180);expect(angleFromPoint(c,{x:3,y:4})).toBe(270)
+  expect(angleFromPoint(c,{x:6,y:5})).toBe(45)
+  const a=angleFromPoint(c,{x:5+Math.sin(50*Math.PI/180),y:4+Math.cos(50*Math.PI/180)})!;expect(a).toBeCloseTo(50,0);expect(a).not.toBe(45)
+  const near=angleFromPoint(c,{x:5+Math.sin(92*Math.PI/180),y:4+Math.cos(92*Math.PI/180)})!;expect(near).toBe(90) // a 2°: gruda
+  expect(angleFromPoint(c,{x:5+Math.sin(92*Math.PI/180),y:4+Math.cos(92*Math.PI/180)},false)).toBeCloseTo(92,0)
+  expect(angleFromPoint(c,c)).toBeNull()
+ })
+ it('o anel só existe com o ponto inicial selecionado e fica por fora da seta',()=>{
+  const onRing={x:5+ring*Math.sin(1),y:4+ring*Math.cos(1)}
+  expect(hit(base,onRing.x,onRing.y,{startSelected:true,roomActive:false})).toEqual({kind:'rotate'})
+  expect(hit(base,onRing.x,onRing.y)).toBeNull()                                // sem seleção: nada
+  expect(hit(base,5,4+(ring+20/ppu),{startSelected:true,roomActive:false})).toBeNull() // longe do anel
+  expect(hit(base,5,4+ring,{startSelected:true,roomActive:false})).toEqual({kind:'rotate'})
+ })
+ it('clicar na seta (corpo ou haste) seleciona o ponto inicial, em qualquer direção',()=>{
+  for(const [heading,angle,dx,dy] of [['up',0,0,1],['right',90,1,0],['down',180,0,-1],['left',270,-1,0]] as const){
+   const r={...base,heading,angle}
+   expect(hit(r,5+dx*(geo.tip-6)/ppu,4+dy*(geo.tip-6)/ppu)).toEqual({kind:'start'}) // perto da ponta da seta
+  }
+  const diag={...base,angle:45}
+  expect(hit(diag,5+Math.SQRT1_2*(geo.tip-6)/ppu,4+Math.SQRT1_2*(geo.tip-6)/ppu)).toEqual({kind:'start'})
+  expect(hit(base,5+(geo.dot+20)/ppu,4+10/ppu)).toBeNull()                    // ao lado da seta, fora dela
+ })
+ it('o anel não engole um obstáculo selecionável perto do ponto inicial',()=>{
+  const r={...base,obstacles:[{id:'a',x:5.6,y:4.6,width:0.6,height:0.6}]}
+  expect(hit(r,5.9,4.9,{startSelected:false})).toEqual({kind:'obstacle',id:'a'})
  })
 })

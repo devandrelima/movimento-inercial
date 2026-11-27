@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest'
-import {DEFAULT_ROOM,roomVector,traversable,validRoom,type Room} from './room'
+import {DEFAULT_ROOM,facing,headingFromAngle,normalizeAngle,roomAngle,roomVector,traversable,validRoom,type Room} from './room'
 import {MapMatcher,RoomPath} from './map-match'
 const room:Room={...DEFAULT_ROOM,width:10,height:10,start:{x:1,y:1},obstacles:[{id:'a',x:3,y:3,width:2,height:2}]}
 describe('geometria da sala',()=>{
@@ -22,6 +22,45 @@ describe('geometria da sala',()=>{
  it('alinha frente e direita aos eixos selecionados',()=>{
   const forward=roomVector({x:0,y:1},'right');expect(forward.x).toBeCloseTo(1);expect(forward.y).toBeCloseTo(0)
   expect(roomVector({x:1,y:0},'right')).toEqual({x:0,y:-1})
+ })
+})
+describe('direção da frente em qualquer ângulo',()=>{
+ it('normaliza, deriva a direção cardeal e mantém salas antigas (sem ângulo)',()=>{
+  expect(normalizeAngle(-90)).toBe(270);expect(normalizeAngle(360)).toBe(0);expect(normalizeAngle(725.04)).toBe(5);expect(normalizeAngle(359.97)).toBe(0)
+  expect([0,44,46,100,200,300,359].map(headingFromAngle)).toEqual(['up','up','right','right','down','left','up'])
+  expect(roomAngle({heading:'left'})).toBe(270);expect(roomAngle({heading:'up',angle:37.5})).toBe(37.5);expect(facing(95)).toEqual({angle:95,heading:'right'})
+ })
+ it('gira a frente de forma exata nos eixos e contínua entre eles',()=>{
+  const right=roomVector({x:0,y:1},90),down=roomVector({x:0,y:1},180)
+  expect(right.x).toBe(1);expect(right.y).toBeCloseTo(0);expect(roomVector({x:0,y:1},0)).toEqual({x:0,y:1});expect(down.x).toBeCloseTo(0);expect(down.y).toBe(-1)
+  const diag=roomVector({x:0,y:1},45);expect(diag.x).toBeCloseTo(Math.SQRT1_2);expect(diag.y).toBeCloseTo(Math.SQRT1_2)
+  const back=roomVector({x:0,y:1},-30);expect(back.x).toBeCloseTo(-0.5);expect(back.y).toBeCloseTo(Math.sqrt(3)/2)
+  // os quatro nomes de direção continuam equivalentes aos ângulos
+  for(const [name,deg] of [['up',0],['right',90],['down',180],['left',270]] as const)expect(roomVector({x:0.3,y:0.7},name)).toEqual(roomVector({x:0.3,y:0.7},deg))
+ })
+ it('valida o ângulo opcional',()=>{
+  const base:Room={...DEFAULT_ROOM,width:10,height:8,start:{x:1,y:1},obstacles:[]}
+  expect(validRoom({...base,angle:0})).toBe(true);expect(validRoom({...base,angle:359.9})).toBe(true);expect(validRoom(base)).toBe(true)
+  for(const angle of [-1,360,NaN,Infinity,'90' as unknown as number])expect(validRoom({...base,angle})).toBe(false)
+ })
+})
+
+describe('traçado incremental com alinhamento provisório',()=>{
+ it('alimentar aos poucos (provisório → final) dá o mesmo resultado que calcular tudo de uma vez',()=>{
+  const open:Room={...DEFAULT_ROOM,width:30,height:30,start:{x:15,y:15},heading:'up',obstacles:[]}
+  const walk=[{x:0,y:0},{x:0.06,y:0.1},{x:0.13,y:0.27},{x:0.2,y:0.45},{x:0.32,y:0.62},{x:0.4,y:0.85},{x:0.52,y:1.1},{x:0.6,y:1.4}]
+  const incremental=new RoomPath(open);let last
+  for(let n=1;n<=walk.length;n++)last=incremental.update(walk.slice(0,n))
+  const once=new RoomPath(open).update(walk)
+  expect(last!.raw).toHaveLength(once.raw.length);expect(last!.corrected).toHaveLength(once.corrected.length)
+  last!.raw.forEach((p,i)=>{expect(p.x).toBeCloseTo(once.raw[i].x,9);expect(p.y).toBeCloseTo(once.raw[i].y,9)})
+  last!.corrected.forEach((p,i)=>{expect(p.x).toBeCloseTo(once.corrected[i].x,9);expect(p.y).toBeCloseTo(once.corrected[i].y,9)})
+ })
+ it('começa a desenhar assim que há 25 cm de deslocamento, antes dos 75 cm da âncora final',()=>{
+  const open:Room={...DEFAULT_ROOM,width:30,height:30,start:{x:15,y:15},heading:'up',obstacles:[]}
+  const path=new RoomPath(open)
+  expect(path.update([{x:0,y:0},{x:0.1,y:0.1}]).raw).toHaveLength(0)
+  expect(path.update([{x:0,y:0},{x:0.1,y:0.1},{x:0.05,y:0.3}]).raw.length).toBeGreaterThan(1)
  })
 })
 describe('filtro de mapa experimental',()=>{

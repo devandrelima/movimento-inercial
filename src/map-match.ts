@@ -1,5 +1,5 @@
-import {alignForward} from './map-geometry'
-import {roomVector,traversable,type Room} from './room'
+import {alignInfo} from './map-geometry'
+import {roomAngle,roomVector,traversable,type Room} from './room'
 import type {Point} from './tracker'
 import {distanceToRoute,planRoute} from './route'
 
@@ -99,12 +99,21 @@ export class RoomPath {
  private goal:Point|null
  private offRoute=0
  constructor(room:Room,goal:Point|null=null){this.room=room;this.goal=goal;this.matcher=new MapMatcher(room);this.route=goal?planRoute(room,room.start,goal):null;this.matcher.setRoute(this.route)}
+ private anchor=-1
+ private anchorFinal=false
+ private restart(){
+  // A nova âncora (provisória → final) muda a direção de todo o trecho já calculado: recomeça do zero.
+  this.matcher=new MapMatcher(this.room);this.route=this.goal?planRoute(this.room,this.room.start,this.goal):null;this.matcher.setRoute(this.route)
+  this.raw=[];this.corrected=[];this.processed=0;this.lost=false;this.offRoute=0
+ }
  update(points:Point[]):MatchedPath {
-  const aligned=alignForward(points)
-  if(!aligned)return {raw:[],corrected:[],lost:false,constrained:false,route:this.route}
-  const world=aligned.map(p=>{const v=roomVector(p,this.room.heading);return {x:this.room.start.x+v.x,y:this.room.start.y+v.y}})
+  const info=alignInfo(points)
+  if(!info)return {raw:[],corrected:[],lost:false,constrained:false,route:this.route}
+  if(info.anchorIndex!==this.anchor||info.final!==this.anchorFinal){if(this.processed)this.restart();this.anchor=info.anchorIndex;this.anchorFinal=info.final}
+  const aligned=info.points
+  const world=aligned.map(p=>{const v=roomVector(p,roomAngle(this.room));return {x:this.room.start.x+v.x,y:this.room.start.y+v.y}})
   if(!this.processed){this.raw=[world[0]];this.corrected=[world[0]];this.processed=1}
-  while(this.processed<world.length){
+ while(this.processed<world.length){
    const previous=world[this.processed-1],next=world[this.processed]
    this.raw.push(next)
    if(!this.lost){const p=this.matcher.step({x:next.x-previous.x,y:next.y-previous.y});if(p){

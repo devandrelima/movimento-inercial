@@ -1,5 +1,5 @@
 import type {Point} from './tracker'
-import {insideObstacle,MAX_ROOM_SIZE,MIN_ROOM_SIZE,type Room} from './room'
+import {insideObstacle,MAX_ROOM_SIZE,MIN_ROOM_SIZE,normalizeAngle,roomAngle,type Room} from './room'
 
 /** Pontos de controle de um retângulo: cantos (ne, nw, se, sw) e arestas (n, s, e, w). Y cresce para cima. */
 export type HandleDir='n'|'s'|'e'|'w'|'ne'|'nw'|'se'|'sw'
@@ -82,8 +82,13 @@ export function growView(view:View,vis:Bounds,room:Bounds,pad:number,ease:number
 // Em vez de depender do elemento SVG "por cima", o alvo é decidido por prioridade, de modo que
 // obstáculos pequenos ou encostados na borda continuem fáceis de pegar. Distâncias em pixels de tela.
 export type Zone={dir:HandleDir;x0:number;x1:number;y0:number;y1:number}
-export type Hit={kind:'handle';target:string;dir:HandleDir}|{kind:'start'}|{kind:'obstacle';id:string}|null
-export const HIT={handleOut:14,handleIn:10,roomOut:16,roomIn:4,start:14,obstacleTolerance:10,touchScale:1.4}
+export type Hit={kind:'handle';target:string;dir:HandleDir}|{kind:'start'}|{kind:'rotate'}|{kind:'obstacle';id:string}|null
+export const HIT={handleOut:14,handleIn:10,roomOut:16,roomIn:4,start:14,obstacleTolerance:10,touchScale:1.4,ringBand:9,arrowBand:8}
+/** Tamanhos (px) do ponto inicial, da ponta da seta e do anel de rotação; o desenho e o alvo do clique usam os mesmos. */
+export function startGeometry(ppu:number):{dot:number;tip:number;ring:number} {
+ const dot=Math.min(10,Math.max(7,0.19*ppu))
+ return {dot,tip:dot+22,ring:dot+38}
+}
 const SIGNS:Record<HandleDir,[number,number]>={n:[0,1],s:[0,-1],e:[1,0],w:[-1,0],ne:[1,1],nw:[-1,1],se:[1,-1],sw:[-1,-1]}
 /** Cantos antes das arestas: onde as zonas se sobrepõem, o canto vence. */
 export const HANDLE_ORDER:HandleDir[]=['ne','nw','se','sw','n','s','e','w']
@@ -104,7 +109,7 @@ const rectDistance=(r:Rect,p:Point)=>Math.hypot(Math.max(r.x-p.x,0,p.x-(r.x+r.wi
  * sobrepostos) ou, dentro da sala, o mais próximo a poucos pixels; (4) alças da sala, só sem obstáculo selecionado e
  * com a faixa voltada para FORA da sala, para nunca engolir um obstáculo encostado na parede.
  */
-export function hitTest(room:Room,p:Point,options:{ppu:number;touch?:boolean;selectedId:string|null;roomActive:boolean}):Hit {
+export function hitTest(room:Room,p:Point,options:{ppu:number;touch?:boolean;selectedId:string|null;roomActive:boolean;startSelected?:boolean}):Hit {
  const k=options.touch?HIT.touchScale:1,m=(px:number)=>px*k/options.ppu
  const grab=(rect:Rect,outPx:number,inPx:number,target:string):Hit=>{
   const inn=Math.min(inPx*k,Math.min(rect.width,rect.height)*options.ppu/3)/options.ppu
@@ -113,7 +118,16 @@ export function hitTest(room:Room,p:Point,options:{ppu:number;touch?:boolean;sel
  }
  const selected=options.selectedId?room.obstacles.find(o=>o.id===options.selectedId):undefined
  if(selected){const hit=grab(selected,HIT.handleOut,HIT.handleIn,selected.id);if(hit)return hit}
+ // Com o ponto inicial selecionado, o anel de rotação (por fora da seta) vem antes de tudo
+ const geo=startGeometry(options.ppu)
+ if(options.startSelected&&Math.abs(Math.hypot(p.x-room.start.x,p.y-room.start.y)-geo.ring/options.ppu)<=m(HIT.ringBand))return {kind:'rotate'}
+ // O ponto inicial inclui a seta: clicar no corpo ou na haste seleciona/move o ponto
  if(Math.hypot(p.x-room.start.x,p.y-room.start.y)<=m(HIT.start))return {kind:'start'}
+ {
+  const a=roomAngle(room)*Math.PI/180,len=geo.tip/options.ppu,tip={x:room.start.x+Math.sin(a)*len,y:room.start.y+Math.cos(a)*len}
+  const sx=tip.x-room.start.x,sy=tip.y-room.start.y,t=Math.max(0,Math.min(1,((p.x-room.start.x)*sx+(p.y-room.start.y)*sy)/(sx*sx+sy*sy)))
+  if(Math.hypot(p.x-(room.start.x+sx*t),p.y-(room.start.y+sy*t))<=m(HIT.arrowBand))return {kind:'start'}
+ }
  let body:{id:string;area:number}|null=null
  for(const o of room.obstacles)if(inRect(o,p)){const area=o.width*o.height;if(!body||area<=body.area)body={id:o.id,area}}
  if(body)return {kind:'obstacle',id:body.id}
@@ -124,4 +138,17 @@ export function hitTest(room:Room,p:Point,options:{ppu:number;touch?:boolean;sel
  }
  if(options.roomActive)return grab({x:0,y:0,width:room.width,height:room.height},HIT.roomOut,HIT.roomIn,'room')
  return null
+}
+
+/**
+ * Ângulo (graus, 0 = cima, horário) do ponteiro em torno de `center`. Com `snap`, gruda nos múltiplos de 15° quando
+ * está a até 3° deles (facilita acertar 0°, 45°, 90°…). Devolve null se o ponteiro está em cima do centro.
+ */
+export function angleFromPoint(center:Point,p:Point,snap=true):number|null {
+ const dx=p.x-center.x,dy=p.y-center.y
+ if(Math.hypot(dx,dy)<1e-9)return null
+ const raw=normalizeAngle(Math.atan2(dx,dy)*180/Math.PI)
+ if(!snap)return raw
+ const near=Math.round(raw/15)*15
+ return Math.abs(raw-near)<=3?normalizeAngle(near):raw
 }

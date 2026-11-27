@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest'
-import {alignForward,gridStep,headingAngle,initialView,zoomOffset} from './map-geometry'
+import {alignForward,alignInfo,gridStep,headingAngle,initialView,zoomOffset} from './map-geometry'
 describe('mapa',()=>{
  it('usa o primeiro deslocamento para cima e preserva esquerda e direita',()=>{
   const result=alignForward([{x:0,y:0},{x:1,y:0},{x:1,y:-1},{x:1,y:1}])!
@@ -53,5 +53,20 @@ describe('grade e vista inicial para salas grandes',()=>{
  it('respeita a escala mínima e áreas ainda sem tamanho',()=>{
   expect(initialView({width:500,height:500,start:{x:0,y:0}},100,100,48,0.5).scale).toBe(0.5)
   expect(initialView({width:500,height:500,start:{x:0,y:0}},0,0,48,0.5)).toEqual({scale:48,offset:{x:0,y:0}})
+ })
+})
+
+describe('alinhamento provisório da direção inicial',()=>{
+ it('com 25 cm de deslocamento já define uma direção provisória e desenha',()=>{
+  const info=alignInfo([{x:0,y:0},{x:0.05,y:0.08},{x:0,y:0.3}])!
+  expect(info.final).toBe(false);expect(info.anchorIndex).toBe(2);expect(info.points[2].x).toBeCloseTo(0);expect(info.points[2].y).toBeCloseTo(0.3)
+  expect(alignInfo([{x:0,y:0},{x:0.1,y:0.1}])).toBeNull()
+ })
+ it('com 75 cm a âncora passa a ser a final e o desenho se reorienta por ela',()=>{
+  const pts=[{x:0,y:0},{x:0.1,y:0.25},{x:0.3,y:0.5},{x:0.6,y:0.9}]
+  const provisional=alignInfo(pts.slice(0,2))!,final=alignInfo(pts)!
+  expect(provisional.final).toBe(false);expect(final.final).toBe(true);expect(final.anchorIndex).toBe(3)
+  expect(final.points[3].x).toBeCloseTo(0);expect(final.points[3].y).toBeGreaterThan(1)
+  expect(alignForward(pts)).toEqual(final.points)
  })
 })

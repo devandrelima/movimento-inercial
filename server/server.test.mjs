@@ -17,6 +17,13 @@ describe('validador de sala do servidor', () => {
     { ...room, width: 0.5 },
     { ...room, width: 31 },
     { ...room, width: 500, height: 500 },
+    { ...room, angle: 0 },
+    { ...room, angle: 123.4 },
+    { ...room, angle: 359.99 },
+    { ...room, angle: 360 },
+    { ...room, angle: -1 },
+    { ...room, angle: '90' },
+    { ...room, angle: NaN },
     { ...room, width: 500.5 },
     { ...room, width: 501, height: 20 },
     { ...room, height: NaN },
@@ -40,6 +47,9 @@ describe('validador de sala do servidor', () => {
     expect(cleaned).toEqual(room)
     expect(cleanRoom({ ...room, width: 0 })).toBeNull()
     expect(cleanRoom({ ...room, width: 500, height: 500 })).toMatchObject({ width: 500, height: 500 })
+    expect(cleanRoom({ ...room, angle: 37.46 })).toMatchObject({ angle: 37.5, heading: 'up' })
+    expect(cleanRoom(room)).not.toHaveProperty('angle')
+    expect(cleanRoom({ ...room, angle: 400 })).toBeNull()
     expect(cleanRoom({ ...room, width: 501 })).toBeNull()
   })
   it('valida o nome', () => {

@@ -1,14 +1,27 @@
 import type {Point} from './tracker'
 
-// The first sufficiently long estimated displacement defines the initial forward direction.
-// This only works if the user begins by walking straight; it is not a compass.
-export function alignForward(points:Point[], threshold=0.75):Point[] | null {
+export const ALIGN_THRESHOLD=0.75
+export const ALIGN_PROVISIONAL=0.25
+export type Alignment={points:Point[];anchorIndex:number;final:boolean}
+/**
+ * The first sufficiently long estimated displacement defines the initial forward direction.
+ * This only works if the user begins by walking straight; it is not a compass.
+ * To start drawing earlier, the first point 25 cm away already gives a provisional direction; once the path is
+ * 75 cm away, that point becomes the final anchor (the drawing may rotate slightly once). `anchorIndex`/`final`
+ * let callers detect that change.
+ */
+export function alignInfo(points:Point[], threshold=ALIGN_THRESHOLD, provisional=ALIGN_PROVISIONAL):Alignment | null {
   const origin=points[0]
   if (!origin) return null
-  const anchor=points.find(p=>Math.hypot(p.x-origin.x,p.y-origin.y)>=threshold)
-  if (!anchor) return null
-  const dx=anchor.x-origin.x,dy=anchor.y-origin.y,length=Math.hypot(dx,dy)
-  return points.map(p=>({x:(dy*(p.x-origin.x)-dx*(p.y-origin.y))/length,y:(dx*(p.x-origin.x)+dy*(p.y-origin.y))/length}))
+  const far=(limit:number)=>points.findIndex(p=>Math.hypot(p.x-origin.x,p.y-origin.y)>=limit)
+  let anchorIndex=far(threshold),final=anchorIndex>=0
+  if (!final) anchorIndex=far(Math.min(provisional,threshold))
+  if (anchorIndex<0) return null
+  const anchor=points[anchorIndex],dx=anchor.x-origin.x,dy=anchor.y-origin.y,length=Math.hypot(dx,dy)
+  return {anchorIndex,final,points:points.map(p=>({x:(dy*(p.x-origin.x)-dx*(p.y-origin.y))/length,y:(dx*(p.x-origin.x)+dy*(p.y-origin.y))/length}))}
+}
+export function alignForward(points:Point[], threshold=ALIGN_THRESHOLD, provisional=ALIGN_PROVISIONAL):Point[] | null {
+  return alignInfo(points,threshold,provisional)?.points ?? null
 }
 export function zoomOffset(offset:Point, anchor:Point, ratio:number):Point {
   return {x:anchor.x-(anchor.x-offset.x)*ratio,y:anchor.y-(anchor.y-offset.y)*ratio}

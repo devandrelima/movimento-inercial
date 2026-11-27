@@ -59,7 +59,7 @@ Os testes incluem sensores, permissões, janelas de 50 Hz, referencial, exporta�
 
 ## Limitações
 
-- A primeira saída do modelo chega por volta de 3 segundos e não reconstrói aproximadamente os primeiros 2,5 segundos. O usuário deve começar caminhando em linha reta para definir a direção inicial.
+- Com o aparelho parado ao apertar play, a primeira estimativa sai em cerca de 0,7 s (histórico inicial preenchido, só quando as leituras iniciais mostram o aparelho parado); se já estiver em movimento, a primeira saída leva cerca de 2,2 s. O desenho começa com 25 cm de deslocamento, com direção provisória refinada aos 75 cm. O usuário deve começar caminhando em linha reta para definir a direção inicial. Detalhes e avaliação em [integração do modelo](docs/integracao-modelo.md).
 - Leituras indisponíveis, baixa frequência, lacunas, movimento durante pausas e diferenças de calibração ou orientação entre aparelhos podem afetar o resultado.
 - O mapa restringe trajetórias impossíveis conforme a planta informada, mas não garante melhora de precisão nem detecta obstáculos ausentes ou movidos. Se não restarem hipóteses compatíveis, a correção é interrompida; o traço original continua no CSV de trajetórias.
 - As métricas da v2, relatadas na entrega do treinamento, não são uma validação independente da aplicação em um smartphone. Consulte [o documento técnico](docs/integracao-modelo.md).

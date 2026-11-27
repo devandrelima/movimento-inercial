@@ -10,6 +10,7 @@ export function validRoom(r) {
   if (r.version !== 1 || !finite(r.width) || !finite(r.height) || r.width < 1 || r.height < 1 || r.width > MAX_ROOM_SIZE || r.height > MAX_ROOM_SIZE) return false
   if (!r.start || !finite(r.start.x) || !finite(r.start.y) || !HEADINGS.includes(r.heading) || !Array.isArray(r.obstacles) || r.obstacles.length > 20) return false
   if (r.start.x < 0 || r.start.x > r.width || r.start.y < 0 || r.start.y > r.height) return false
+  if (r.angle !== undefined && (!finite(r.angle) || r.angle < 0 || r.angle >= 360)) return false
   const ids = new Set()
   for (const o of r.obstacles) {
     if (!o || typeof o.id !== 'string' || !o.id || o.id.length > 64 || ids.has(o.id)) return false
@@ -29,6 +30,7 @@ export function cleanRoom(value) {
     height: round(value.height),
     start: { x: round(value.start.x), y: round(value.start.y) },
     heading: value.heading,
+    ...(value.angle === undefined ? {} : { angle: Math.round(value.angle * 10) / 10 }),
     obstacles: value.obstacles.map((o) => ({ id: o.id, x: round(o.x), y: round(o.y), width: round(o.width), height: round(o.height) })),
   }
 }

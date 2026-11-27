@@ -21,6 +21,7 @@ async page => {
  await drag([1,1],[2.5,1.5]);near(await field(startBox,'X (m)'),2.5,'início arrastado (X)');near(await field(startBox,'Y (m)'),1.5,'início arrastado (Y)');
  await drag([2.5,1.5],[5,4]);{const x=await field(startBox,'X (m)'),y=await field(startBox,'Y (m)');if(x>=4&&x<=6&&y>=3&&y<=5)throw Error('Início entrou no obstáculo: '+x+','+y)}
  await startBox.getByLabel('X (m)').fill('1');await startBox.getByLabel('Y (m)').fill('1');
+ {const c=await screen(5,4);await page.mouse.click(c.x,c.y)} // arrastar o início o seleciona (anel de rotação); volta a selecionar o obstáculo
  await drag([6,4],[7,4]);near(await field(controls,'Largura'),3,'aresta direita (largura)');near(await field(controls,'Altura'),2,'aresta direita preserva altura');near(await field(controls,'X'),4,'aresta direita preserva X');
  await drag([7,5],[8,6]);near(await field(controls,'Largura'),4,'canto superior direito (largura)');near(await field(controls,'Altura'),3,'canto superior direito (altura)');
  await drag([4,4.5],[3,4.5]);near(await field(controls,'X'),3,'aresta esquerda (X)');near(await field(controls,'Largura'),5,'aresta esquerda (largura)');
@@ -39,7 +40,7 @@ async page => {
  await page.getByLabel('X (m)').fill('5');await page.getByLabel('Y (m)').fill('4');await page.getByRole('button',{name:'Salvar sala'}).click();
  await page.getByRole('alert').waitFor();
  await page.getByLabel('X (m)').fill('1');await page.getByLabel('Y (m)').fill('1');
- await page.getByLabel('Frente').selectOption('up');
+ await page.getByLabel('Frente (°)').fill('0');
  for(const size of [{width:320,height:568},{width:390,height:844},{width:568,height:320},{width:844,height:390}]){
   await page.setViewportSize(size);const bounds=await page.evaluate(()=>{const d=document.documentElement;const controls=['.room-save','.room-canvas','.room-settings'];return {w:innerWidth,h:innerHeight,sw:d.scrollWidth,sh:d.scrollHeight,settingsScroll:document.querySelector('.room-settings').scrollHeight,settingsHeight:document.querySelector('.room-settings').clientHeight,items:controls.map(s=>{const r=document.querySelector(s).getBoundingClientRect();return [s,r.top,r.bottom]})}});
   if(bounds.sw>size.width+1||bounds.sh>size.height+1||bounds.settingsScroll>bounds.settingsHeight+1||bounds.items.some(x=>x[1]<0||x[2]>size.height+1))throw Error('Editor fora da tela: '+JSON.stringify(bounds));

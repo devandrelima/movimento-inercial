@@ -1,9 +1,9 @@
 import {useEffect,useLayoutEffect,useRef,useState,type PointerEvent} from 'react'
 import {flushSync} from 'react-dom'
-import {DEFAULT_ROOM,insideObstacle,MAX_ROOM_SIZE,validRoom,type Heading,type Room,type Obstacle} from './room'
+import {DEFAULT_ROOM,facing,insideObstacle,MAX_ROOM_SIZE,roomAngle,validRoom,type Room,type Obstacle} from './room'
 import type {Point} from './tracker'
 import {gridStep} from './map-geometry'
-import {coversPoint,fitView,growView,hitTest,resizeRect,resizeRoom,VIEW_PAD,type HandleDir,type Hit,type Rect,type View} from './room-edit'
+import {angleFromPoint,coversPoint,fitView,growView,hitTest,resizeRect,startGeometry,resizeRoom,VIEW_PAD,type HandleDir,type Hit,type Rect,type View} from './room-edit'
 import {useAuth} from './auth-ui'
 import PublishDialog from './PublishDialog'
 import type {RoomLink} from './room-link'
@@ -19,7 +19,10 @@ type Gesture={pointer:number}&(
  {kind:'move';id:string;dx:number;dy:number}|
  {kind:'resize';id:string;dir:HandleDir;ox:number;oy:number;base:Rect}|
  {kind:'room';dir:HandleDir;ox:number;oy:number;base:Room}|
- {kind:'start';dx:number;dy:number})
+ {kind:'start';dx:number;dy:number}|
+ {kind:'rotate'})
+/** `selected` guarda o id do obstáculo; o ponto inicial (com o controle de rotação) usa este valor reservado. */
+const START_ID='__start__'
 type Frame=View&{sx:number;sy:number}
 const DIRS:{dir:HandleDir;sx:number;sy:number}[]=[{dir:'n',sx:0,sy:1},{dir:'s',sx:0,sy:-1},{dir:'e',sx:1,sy:0},{dir:'w',sx:-1,sy:0},{dir:'ne',sx:1,sy:1},{dir:'nw',sx:-1,sy:1},{dir:'se',sx:1,sy:-1},{dir:'sw',sx:-1,sy:-1}]
 const CURSOR:Record<HandleDir,string>={n:'ns-resize',s:'ns-resize',e:'ew-resize',w:'ew-resize',ne:'nesw-resize',sw:'nesw-resize',nw:'nwse-resize',se:'nwse-resize'}
@@ -35,10 +38,25 @@ function Handles({rect,ppu}:{rect:Rect;ppu:number}) {
   })}
  </g>
 }
+/** Ponto inicial com a seta da frente; selecionado, mostra o anel de rotação com a alça na ponta da seta. */
+function StartMarker({x,y,angle,ppu,selected,placing,invalid}:{x:number;y:number;angle:number;ppu:number;selected:boolean;placing:boolean;invalid:boolean}) {
+ const u=(px:number)=>px/ppu,geo=startGeometry(ppu),ring=u(geo.ring),teal='#126c70',at=`translate(${x} ${-y}) rotate(${angle})`
+ return <g>
+  {selected&&<>
+   <circle cx={x} cy={-y} r={ring} fill="none" stroke={teal} strokeWidth={u(1.5)} strokeDasharray={`${u(5)} ${u(4)}`} opacity=".75"/>
+   <g transform={at}><circle cx="0" cy={-ring} r={u(7.5)} fill="white" stroke={teal} strokeWidth={u(2)}/></g>
+  </>}
+  {!placing&&<g transform={at}>
+   <line x1="0" y1={-u(geo.dot)} x2="0" y2={-u(geo.tip-10)} stroke={teal} strokeWidth={u(3.5)} strokeLinecap="round"/>
+   <polygon points={`0,${-u(geo.tip)} ${-u(8)},${-u(geo.tip-14)} ${u(8)},${-u(geo.tip-14)}`} fill={teal} stroke="white" strokeWidth={u(1.5)} strokeLinejoin="round"/>
+  </g>}
+  <circle cx={x} cy={-y} r={u(geo.dot)} fill={invalid?'#b8453a':teal} stroke="white" strokeWidth={u(2)}/>
+ </g>
+}
 export default function RoomEditor({initial,link,onSave,onPublished,onUnlinked,onCancel}:Props) {
  const [room,setRoom]=useState<Room>(()=>initial?structuredClone(initial):structuredClone(DEFAULT_ROOM))
  const [selected,setSelected]=useState<string|null>(null),[positionMode,setPositionMode]=useState(false),[attempted,setAttempted]=useState(false)
- const [frame,setFrame]=useState<Frame|null>(null),[ppu,setPpu]=useState(40),[dragging,setDragging]=useState<Gesture['kind']|null>(null)
+ const [frame,setFrame]=useState<Frame|null>(null),[ppu,setPpu]=useState(40)
  const [box,setBox]=useState({w:600,h:400}),[publishing,setPublishing]=useState(false)
  const auth=useAuth()
  const svg=useRef<SVGSVGElement>(null),drag=useRef<Gesture|null>(null),frameRef=useRef<Frame|null>(null),pointerRef=useRef<Point|null>(null),lastRoom=useRef<Room|null>(null),lastKey=useRef(''),loop=useRef(0),tween=useRef(0),lastTick=useRef(0)
@@ -76,15 +94,16 @@ export default function RoomEditor({initial,link,onSave,onPublished,onUnlinked,o
  }
  const inRoom=(p:Point):Point=>({x:round(clamp(p.x,0,safeWidth)),y:round(clamp(p.y,0,safeHeight))})
  const roomLimits={minX:0,minY:0,maxX:safeWidth,maxY:safeHeight}
- function begin(event:PointerEvent<SVGSVGElement>,gesture:Gesture){drag.current=gesture;setDragging(gesture.kind);event.currentTarget.setPointerCapture(event.pointerId)}
+ function begin(event:PointerEvent<SVGSVGElement>,gesture:Gesture){drag.current=gesture;event.currentTarget.setPointerCapture(event.pointerId)}
  function down(event:PointerEvent<SVGSVGElement>){
   if(event.pointerType==='mouse'&&event.button!==0)return
   const raw=point(event);if(!raw)return
   if(positionMode){update({start:inRoom(raw)});setPositionMode(false);return}
   const pointer=event.pointerId
-  const hit=hitTest(hitRoom(),raw,{ppu,touch:event.pointerType==='touch',selectedId:selected,roomActive:!object})
+  const hit=hitTest(hitRoom(),raw,{ppu,touch:event.pointerType==='touch',selectedId:selected,roomActive,startSelected})
   if(!hit){setSelected(null);return}
-  if(hit.kind==='start'){begin(event,{kind:'start',pointer,dx:room.start.x-raw.x,dy:room.start.y-raw.y});return}
+  if(hit.kind==='rotate'){begin(event,{kind:'rotate',pointer});return}
+  if(hit.kind==='start'){setSelected(START_ID);begin(event,{kind:'start',pointer,dx:room.start.x-raw.x,dy:room.start.y-raw.y});return}
   if(hit.kind==='handle'){
    const dir=hit.dir,id=hit.target
    const edge=(base:Rect)=>({ox:dir.includes('w')?base.x-raw.x:dir.includes('e')?base.x+base.width-raw.x:0,oy:dir.includes('s')?base.y-raw.y:dir.includes('n')?base.y+base.height-raw.y:0})
@@ -107,14 +126,18 @@ export default function RoomEditor({initial,link,onSave,onPublished,onUnlinked,o
  function hover(event:PointerEvent<SVGSVGElement>){
   if(event.pointerType==='touch'||positionMode)return
   const raw=point(event),el=svg.current;if(!raw||!el)return
-  const hit:Hit=hitTest(hitRoom(),raw,{ppu,selectedId:selected,roomActive:!object})
-  el.style.cursor=!hit?'crosshair':hit.kind==='handle'?CURSOR[hit.dir]:hit.kind==='start'?'grab':'move'
+  const hit:Hit=hitTest(hitRoom(),raw,{ppu,selectedId:selected,roomActive,startSelected})
+  el.style.cursor=!hit?'crosshair':hit.kind==='handle'?CURSOR[hit.dir]:hit.kind==='start'||hit.kind==='rotate'?'grab':'move'
  }
  function move(event:PointerEvent<SVGSVGElement>){
   const g=drag.current,raw=point(event)
   if(!g){hover(event);return}
   if(g.pointer!==event.pointerId||!raw)return
   if(g.kind==='room'){pointerRef.current={x:event.clientX,y:event.clientY};stepRoom();return}
+  if(g.kind==='rotate'){
+   // O controle externo gira a seta para o ponteiro (gruda a cada 15° quando está perto)
+   const angle=angleFromPoint(room.start,raw);if(angle!==null)update(facing(angle));return
+  }
   if(g.kind==='start'){
    const p={x:round(clamp(raw.x+g.dx,0,safeWidth)),y:round(clamp(raw.y+g.dy,0,safeHeight))}
    if(!room.obstacles.some(o=>coversPoint(o,p)))update({start:p});return
@@ -158,12 +181,12 @@ export default function RoomEditor({initial,link,onSave,onPublished,onUnlinked,o
   tween.current=requestAnimationFrame(run)
  }
  function end(){
-  const g=drag.current;drag.current=null;setDragging(null)
+  const g=drag.current;drag.current=null
   if(g?.kind!=='room')return
   cancelAnimationFrame(loop.current);settle()
  }
  const u=(px:number)=>px/ppu,tx=view.sx,ty=-view.sy,grid=gridStep(ppu,14)
- const roomActive=!object&&!positionMode
+ const startSelected=selected===START_ID,roomActive=!object&&!startSelected&&!positionMode
  async function startPublish(){
   // O login é pedido antes de abrir a janela de publicação.
   const ok=await auth.run('Para publicar um mapa é preciso entrar com usuário e senha.',async()=>true)
@@ -181,14 +204,13 @@ export default function RoomEditor({initial,link,onSave,onPublished,onUnlinked,o
      <rect x="0" y={-safeHeight} width={safeWidth} height={safeHeight} fill="none" stroke={roomActive?'#126c70':'#476f6d'} strokeWidth={Math.max(roomActive?.1:.08,u(roomActive?2.5:2))} pointerEvents="none"/>
      {roomActive&&<Handles rect={{x:0,y:0,width:safeWidth,height:safeHeight}} ppu={ppu}/>}
      {object&&<Handles rect={object} ppu={ppu}/>}
-     {!positionMode&&<g data-start="" style={{cursor:dragging==='start'?'grabbing':'grab'}}><circle cx={room.start.x} cy={-room.start.y} r={Math.max(.19,u(7))} fill={room.obstacles.some(o=>insideObstacle(room.start,o))?'#b8453a':'#126c70'} stroke="white" strokeWidth={Math.max(.06,u(2))} pointerEvents="none"/></g>}
-     {positionMode&&<circle cx={room.start.x} cy={-room.start.y} r={Math.max(.19,u(7))} fill="#126c70" stroke="white" strokeWidth={Math.max(.06,u(2))} pointerEvents="none"/>}
+     <StartMarker x={room.start.x} y={room.start.y} angle={roomAngle(room)} ppu={ppu} selected={startSelected} placing={positionMode} invalid={room.obstacles.some(o=>insideObstacle(room.start,o))}/>
     </g>
    </svg></div>
    {attempted&&!validRoom(room)&&<p className="room-error room-canvas-error" role="alert">Confira as medidas: sala de 1 a 500 m, obstáculos dentro dela e ponto inicial livre.</p>}
   </section><aside className="room-settings" aria-label="Configuração da sala">
    <div className="room-section"><div className="room-section-title"><h2>Dimensões da sala <span>(metros)</span></h2>{initial&&<button className="room-link room-danger" onClick={()=>{if(window.confirm('Remover a sala e os obstáculos salvos neste dispositivo?'))onSave(null)}}>Remover sala</button>}</div><div className="room-fields two"><NumberField label="Largura" value={room.width} onChange={width=>update({width})}/><NumberField label="Altura" value={room.height} onChange={height=>update({height})}/></div></div>
-   <div className="room-section"><div className="room-section-title"><h2>Início da caminhada</h2><button className={`room-link${positionMode?' active':''}`} onClick={()=>{setPositionMode(!positionMode);setSelected(null)}}>Marcar no mapa</button></div><div className="room-fields three"><NumberField label="X (m)" value={room.start.x} onChange={x=>update({start:{...room.start,x}})}/><NumberField label="Y (m)" value={room.start.y} onChange={y=>update({start:{...room.start,y}})}/><label className="room-number"><span>Frente</span><select value={room.heading} onChange={event=>update({heading:event.target.value as Heading})}><option value="up">↑ Cima</option><option value="right">→ Direita</option><option value="down">↓ Baixo</option><option value="left">← Esquerda</option></select></label></div></div>
+   <div className="room-section"><div className="room-section-title"><h2>Início da caminhada</h2><button className={`room-link${positionMode?' active':''}`} onClick={()=>{setPositionMode(!positionMode);setSelected(null)}}>Marcar no mapa</button></div><div className="room-fields three"><NumberField label="X (m)" value={room.start.x} onChange={x=>update({start:{...room.start,x}})}/><NumberField label="Y (m)" value={room.start.y} onChange={y=>update({start:{...room.start,y}})}/><NumberField label="Frente (°)" value={Number.isFinite(room.angle??0)?roomAngle(room):NaN} onChange={angle=>Number.isFinite(angle)?update(facing(angle)):update({angle})}/></div></div>
    <div className="room-section"><div className="room-section-title"><h2>Obstáculos <span>({room.obstacles.length}/20)</span></h2><button className="room-link" onClick={addObstacle} disabled={room.obstacles.length>=20}>+ Adicionar</button></div>
     {object ? <><div className="room-fields four"><NumberField label="X" value={object.x} onChange={x=>updateObstacle(object.id,{x})}/><NumberField label="Y" value={object.y} onChange={y=>updateObstacle(object.id,{y})}/><NumberField label="Largura" value={object.width} onChange={width=>updateObstacle(object.id,{width})}/><NumberField label="Altura" value={object.height} onChange={height=>updateObstacle(object.id,{height})}/></div><button className="room-delete" onClick={()=>{setRoom(r=>({...r,obstacles:r.obstacles.filter(o=>o.id!==object.id)}));setSelected(null)}}>Remover selecionado</button></> : <p className="room-empty">{room.obstacles.length?'Selecione um obstáculo na planta.':'Adicione mesas, armários ou outros obstáculos fixos.'}</p>}
    </div>

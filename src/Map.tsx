@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import type {Segment} from './tracker'
 import {alignForward,gridStep,headingAngle,initialView,zoomOffset} from './map-geometry'
-import {roomVector,type Room} from './room'
+import {roomAngle,roomVector,type Room} from './room'
 import type {MatchedPath} from './map-match'
 
 type Point = { x: number; y: number }
@@ -118,7 +118,7 @@ export default function Map({ resetKey, segments, room, matched, goal, route, on
       {room && <g aria-label="Sala e obstáculos"><rect x={-room.start.x*pixelsPerMeter} y={(room.start.y-room.height)*pixelsPerMeter} width={room.width*pixelsPerMeter} height={room.height*pixelsPerMeter} fill="#eef7f4" fillOpacity=".5" stroke="#608f89" strokeWidth="2"/>{room.obstacles.map(o=><rect key={o.id} x={(o.x-room.start.x)*pixelsPerMeter} y={(room.start.y-o.y-o.height)*pixelsPerMeter} width={o.width*pixelsPerMeter} height={o.height*pixelsPerMeter} fill="#a9c9c5" stroke="#638c87" strokeWidth="1.5"/>)}</g>}
       {room && route && <polyline aria-label="Rota sugerida" points={route.map(p=>`${(p.x-room.start.x)*pixelsPerMeter},${(room.start.y-p.y)*pixelsPerMeter}`).join(' ')} fill="none" stroke="#9b6921" strokeWidth="2.5" strokeDasharray="7 5"/>}
       {room && goal && <circle aria-label="Destino" cx={(goal.x-room.start.x)*pixelsPerMeter} cy={(room.start.y-goal.y)*pixelsPerMeter} r="6" fill="#9b6921" stroke="white" strokeWidth="2"/>}
-      {room && <line x1="0" y1="0" x2={roomVector({x:0,y:1},room.heading).x*30} y2={-roomVector({x:0,y:1},room.heading).y*30} stroke="#568b83" strokeWidth="2" markerEnd="url(#room-direction-arrow)"/>}
+      {room && <line x1="0" y1="0" x2={roomVector({x:0,y:1},roomAngle(room)).x*30} y2={-roomVector({x:0,y:1},roomAngle(room)).y*30} stroke="#568b83" strokeWidth="2" markerEnd="url(#room-direction-arrow)"/>}
       {aligned.map((segment,index)=>{
         if(!segment.points)return null
         const last=segment.points[segment.points.length-1],heading=segment.points.length>1?headingAngle(segment.points):null
