@@ -1,6 +1,7 @@
 import {alignForward} from './map-geometry'
 import {roomVector,traversable,type Room} from './room'
 import type {Point} from './tracker'
+import {distanceToRoute,planRoute} from './route'
 
 type Particle = Point & {headingError:number}
 type Candidate = {particle:Particle;weight:number}
@@ -20,6 +21,8 @@ export class MapMatcher {
  private room:Room
  private count:number
  private mapConstrained=false
+ private route:Point[]|null=null
+ setRoute(route:Point[]|null){this.route=route}
  constructor(room:Room,count=128){
   if(!Number.isInteger(count)||count<1)throw new Error('Quantidade de hipóteses inválida')
   this.room=room;this.count=count;this.output={...room.start}
@@ -37,6 +40,8 @@ export class MapMatcher {
   const desired={x:this.output.x+delta.x,y:this.output.y+delta.y}
   if(!traversable(this.room,this.output,desired))this.mapConstrained=true
   const candidates:Candidate[]=[]
+  // A bounded, weak preference only near the current route; never excludes a valid alternative.
+  const guide=this.route && distanceToRoute(this.output,this.route)<1 ? this.route : null
   for(const p of this.particles){
    const heading=clampHeading(p.headingError+this.normal()*0.035*Math.sqrt(distance))
    const scale=Math.max(0.55,Math.min(1.45,1+this.normal()*0.10))
@@ -46,7 +51,8 @@ export class MapMatcher {
     // Both checks are needed: preserve a feasible particle history AND avoid a
     // visible jump across an obstacle from the last displayed estimate.
     if(!traversable(this.room,p,next)||!traversable(this.room,this.output,next))return false
-    candidates.push({particle:next,weight});return true
+    const preference=guide ? 1-0.02*Math.min(1,distanceToRoute(next,guide)) : 1
+    candidates.push({particle:next,weight:weight*preference});return true
    }
    if(!propose(heading,1)){
     this.mapConstrained=true
@@ -80,7 +86,7 @@ export class MapMatcher {
   return {...this.output}
  }
 }
-export type MatchedPath={raw:Point[];corrected:Point[];lost:boolean;constrained:boolean}
+export type MatchedPath={raw:Point[];corrected:Point[];lost:boolean;constrained:boolean;route:Point[]|null}
 /** Incrementally applies one local-to-room transform and map filter per session. */
 export class RoomPath {
  private matcher:MapMatcher
@@ -89,18 +95,27 @@ export class RoomPath {
  private processed=0
  private lost=false
  private room:Room
- constructor(room:Room){this.room=room;this.matcher=new MapMatcher(room)}
+ private route:Point[]|null
+ private goal:Point|null
+ private offRoute=0
+ constructor(room:Room,goal:Point|null=null){this.room=room;this.goal=goal;this.matcher=new MapMatcher(room);this.route=goal?planRoute(room,room.start,goal):null;this.matcher.setRoute(this.route)}
  update(points:Point[]):MatchedPath {
   const aligned=alignForward(points)
-  if(!aligned)return {raw:[],corrected:[],lost:false,constrained:false}
+  if(!aligned)return {raw:[],corrected:[],lost:false,constrained:false,route:this.route}
   const world=aligned.map(p=>{const v=roomVector(p,this.room.heading);return {x:this.room.start.x+v.x,y:this.room.start.y+v.y}})
   if(!this.processed){this.raw=[world[0]];this.corrected=[world[0]];this.processed=1}
   while(this.processed<world.length){
    const previous=world[this.processed-1],next=world[this.processed]
    this.raw.push(next)
-   if(!this.lost){const p=this.matcher.step({x:next.x-previous.x,y:next.y-previous.y});if(p)this.corrected.push(p);else this.lost=true}
+   if(!this.lost){const p=this.matcher.step({x:next.x-previous.x,y:next.y-previous.y});if(p){
+    this.corrected.push(p)
+    if(this.goal&&this.route){
+     this.offRoute=distanceToRoute(p,this.route)>1?this.offRoute+1:0
+     if(this.offRoute>=3){this.route=planRoute(this.room,p,this.goal);this.matcher.setRoute(this.route);this.offRoute=0}
+    }
+   }else this.lost=true}
    this.processed++
   }
-  return {raw:[...this.raw],corrected:[...this.corrected],lost:this.lost,constrained:this.matcher.constrained}
+  return {raw:[...this.raw],corrected:[...this.corrected],lost:this.lost,constrained:this.matcher.constrained,route:this.route}
  }
 }
