@@ -3,7 +3,7 @@ import {flushSync} from 'react-dom'
 import {DEFAULT_ROOM,insideObstacle,MAX_ROOM_SIZE,validRoom,type Heading,type Room,type Obstacle} from './room'
 import type {Point} from './tracker'
 import {gridStep} from './map-geometry'
-import {coversPoint,fitView,growView,resizeRect,resizeRoom,VIEW_PAD,type HandleDir,type Rect,type View} from './room-edit'
+import {coversPoint,fitView,growView,hitTest,resizeRect,resizeRoom,VIEW_PAD,type HandleDir,type Hit,type Rect,type View} from './room-edit'
 import {useAuth} from './auth-ui'
 import PublishDialog from './PublishDialog'
 import type {RoomLink} from './room-link'
@@ -23,14 +23,10 @@ type Gesture={pointer:number}&(
 type Frame=View&{sx:number;sy:number}
 const DIRS:{dir:HandleDir;sx:number;sy:number}[]=[{dir:'n',sx:0,sy:1},{dir:'s',sx:0,sy:-1},{dir:'e',sx:1,sy:0},{dir:'w',sx:-1,sy:0},{dir:'ne',sx:1,sy:1},{dir:'nw',sx:-1,sy:1},{dir:'se',sx:1,sy:-1},{dir:'sw',sx:-1,sy:-1}]
 const CURSOR:Record<HandleDir,string>={n:'ns-resize',s:'ns-resize',e:'ew-resize',w:'ew-resize',ne:'nesw-resize',sw:'nesw-resize',nw:'nwse-resize',se:'nwse-resize'}
-const REACH=14,INNER=10
-/** Pontos de controle em torno de um retângulo; tamanhos em pixels de tela, convertidos por `ppu` (pixels por metro). */
-function Handles({rect,target,ppu}:{rect:Rect;target:string;ppu:number}) {
+/** Desenha os pontos de controle de um retângulo (tamanhos em pixels de tela, via `ppu`). Quem recebe o toque é `hitTest`. */
+function Handles({rect,ppu}:{rect:Rect;ppu:number}) {
  const {x,y,width,height}=rect,u=(px:number)=>px/ppu
- const out=u(REACH),inn=u(Math.min(INNER,Math.min(width,height)*ppu/3))
- const range=(s:number,lo:number,hi:number):[number,number]=>s<0?[lo-out,lo+inn]:s>0?[hi-inn,hi+out]:[lo+inn,hi-inn]
  return <g>
-  {DIRS.map(({dir,sx,sy})=>{const [x0,x1]=range(sx,x,x+width),[y0,y1]=range(sy,y,y+height);return <rect key={'z'+dir} data-handle={dir} data-target={target} x={x0} y={-y1} width={x1-x0} height={y1-y0} fill="none" pointerEvents="all" style={{cursor:CURSOR[dir]}}/>})}
   {DIRS.map(({dir,sx,sy})=>{
    const cx=sx<0?x:sx>0?x+width:x+width/2,cy=sy<0?y:sy>0?y+height:y+height/2,corner=sx!==0&&sy!==0
    if(!corner&&(sx===0?width:height)*ppu<48)return null
@@ -85,11 +81,12 @@ export default function RoomEditor({initial,link,onSave,onPublished,onUnlinked,o
   if(event.pointerType==='mouse'&&event.button!==0)return
   const raw=point(event);if(!raw)return
   if(positionMode){update({start:inRoom(raw)});setPositionMode(false);return}
-  const target=event.target as Element,pointer=event.pointerId
-  if(target.closest('[data-start]')){begin(event,{kind:'start',pointer,dx:room.start.x-raw.x,dy:room.start.y-raw.y});return}
-  const handle=target.closest('[data-handle]')
-  if(handle){
-   const dir=handle.getAttribute('data-handle') as HandleDir,id=handle.getAttribute('data-target')
+  const pointer=event.pointerId
+  const hit=hitTest(hitRoom(),raw,{ppu,touch:event.pointerType==='touch',selectedId:selected,roomActive:!object})
+  if(!hit){setSelected(null);return}
+  if(hit.kind==='start'){begin(event,{kind:'start',pointer,dx:room.start.x-raw.x,dy:room.start.y-raw.y});return}
+  if(hit.kind==='handle'){
+   const dir=hit.dir,id=hit.target
    const edge=(base:Rect)=>({ox:dir.includes('w')?base.x-raw.x:dir.includes('e')?base.x+base.width-raw.x:0,oy:dir.includes('s')?base.y-raw.y:dir.includes('n')?base.y+base.height-raw.y:0})
    if(id==='room'){
     const base={...room,width:safeWidth,height:safeHeight}
@@ -101,14 +98,22 @@ export default function RoomEditor({initial,link,onSave,onPublished,onUnlinked,o
    const o=room.obstacles.find(item=>item.id===id);if(!o)return
    const base={x:o.x,y:o.y,width:o.width,height:o.height};begin(event,{kind:'resize',pointer,id:o.id,dir,base,...edge(base)});return
   }
-  const hit=target.closest('[data-obstacle]')
-  if(!hit){setSelected(null);return}
-  const o=room.obstacles.find(item=>item.id===hit.getAttribute('data-obstacle'));if(!o)return
+  const o=room.obstacles.find(item=>item.id===hit.id);if(!o)return
   const p=inRoom(raw);setSelected(o.id);begin(event,{kind:'move',pointer,id:o.id,dx:p.x-o.x,dy:p.y-o.y})
+ }
+ /** Sala com as medidas já saneadas (campos em edição podem estar vazios ou fora do limite). */
+ function hitRoom():Room{return {...room,width:safeWidth,height:safeHeight}}
+ /** Sem gesto em andamento, o cursor acompanha o alvo sob o ponteiro (mouse). */
+ function hover(event:PointerEvent<SVGSVGElement>){
+  if(event.pointerType==='touch'||positionMode)return
+  const raw=point(event),el=svg.current;if(!raw||!el)return
+  const hit:Hit=hitTest(hitRoom(),raw,{ppu,selectedId:selected,roomActive:!object})
+  el.style.cursor=!hit?'crosshair':hit.kind==='handle'?CURSOR[hit.dir]:hit.kind==='start'?'grab':'move'
  }
  function move(event:PointerEvent<SVGSVGElement>){
   const g=drag.current,raw=point(event)
-  if(!g||g.pointer!==event.pointerId||!raw)return
+  if(!g){hover(event);return}
+  if(g.pointer!==event.pointerId||!raw)return
   if(g.kind==='room'){pointerRef.current={x:event.clientX,y:event.clientY};stepRoom();return}
   if(g.kind==='start'){
    const p={x:round(clamp(raw.x+g.dx,0,safeWidth)),y:round(clamp(raw.y+g.dy,0,safeHeight))}
@@ -170,13 +175,13 @@ export default function RoomEditor({initial,link,onSave,onPublished,onUnlinked,o
   <div className="room-layout"><section className="room-canvas-panel" aria-label="Planta da sala">
    <div className="room-canvas-wrap"><svg ref={svg} className="room-canvas" viewBox={`${view.x} ${-(view.y+view.h)} ${view.w} ${view.h}`} preserveAspectRatio="xMidYMid meet" onPointerDown={down} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end} role="img" aria-label="Planta da sala com obstáculos e posição inicial">
     <defs><pattern id="room-grid" width={grid} height={grid} patternUnits="userSpaceOnUse"><path d={`M ${grid} 0 L 0 0 0 ${grid}`} fill="none" stroke="#dbe8e6" strokeWidth={Math.max(.025,u(1))}/></pattern></defs>
-    <g transform={`translate(${tx} ${ty})`}>
+    <g transform={`translate(${tx} ${ty})`} pointerEvents="none">
      <rect x="0" y={-safeHeight} width={safeWidth} height={safeHeight} fill="#f8fbfa"/><rect x="0" y={-safeHeight} width={safeWidth} height={safeHeight} fill="url(#room-grid)"/>
      {room.obstacles.map(o=><rect key={o.id} data-obstacle={o.id} x={o.x} y={-o.y-o.height} width={Math.max(0,o.width)} height={Math.max(0,o.height)} fill={selected===o.id?'#a8cac6':'#c6d8d5'} stroke={selected===o.id?'#126c70':'#71918d'} strokeWidth={Math.max(.06,u(1.5))}/>) }
      <rect x="0" y={-safeHeight} width={safeWidth} height={safeHeight} fill="none" stroke={roomActive?'#126c70':'#476f6d'} strokeWidth={Math.max(roomActive?.1:.08,u(roomActive?2.5:2))} pointerEvents="none"/>
-     {roomActive&&<Handles rect={{x:0,y:0,width:safeWidth,height:safeHeight}} target="room" ppu={ppu}/>}
-     {object&&<Handles rect={object} target={object.id} ppu={ppu}/>}
-     {!positionMode&&<g data-start="" style={{cursor:dragging==='start'?'grabbing':'grab'}}><circle cx={room.start.x} cy={-room.start.y} r={Math.max(.19,u(7))} fill={room.obstacles.some(o=>insideObstacle(room.start,o))?'#b8453a':'#126c70'} stroke="white" strokeWidth={Math.max(.06,u(2))} pointerEvents="none"/><circle cx={room.start.x} cy={-room.start.y} r={u(18)} fill="none" pointerEvents="all"/></g>}
+     {roomActive&&<Handles rect={{x:0,y:0,width:safeWidth,height:safeHeight}} ppu={ppu}/>}
+     {object&&<Handles rect={object} ppu={ppu}/>}
+     {!positionMode&&<g data-start="" style={{cursor:dragging==='start'?'grabbing':'grab'}}><circle cx={room.start.x} cy={-room.start.y} r={Math.max(.19,u(7))} fill={room.obstacles.some(o=>insideObstacle(room.start,o))?'#b8453a':'#126c70'} stroke="white" strokeWidth={Math.max(.06,u(2))} pointerEvents="none"/></g>}
      {positionMode&&<circle cx={room.start.x} cy={-room.start.y} r={Math.max(.19,u(7))} fill="#126c70" stroke="white" strokeWidth={Math.max(.06,u(2))} pointerEvents="none"/>}
     </g>
    </svg></div>

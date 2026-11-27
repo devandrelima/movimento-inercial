@@ -77,3 +77,51 @@ export function growView(view:View,vis:Bounds,room:Bounds,pad:number,ease:number
  if(room.t+pad>vis.t+eps)t+=(room.t+pad-t)*ease
  return {x:l,y:b,w:r-l,h:t-b}
 }
+
+// ---------- Resolução do alvo de um toque/clique no editor ----------
+// Em vez de depender do elemento SVG "por cima", o alvo é decidido por prioridade, de modo que
+// obstáculos pequenos ou encostados na borda continuem fáceis de pegar. Distâncias em pixels de tela.
+export type Zone={dir:HandleDir;x0:number;x1:number;y0:number;y1:number}
+export type Hit={kind:'handle';target:string;dir:HandleDir}|{kind:'start'}|{kind:'obstacle';id:string}|null
+export const HIT={handleOut:14,handleIn:10,roomOut:16,roomIn:4,start:14,obstacleTolerance:10,touchScale:1.4}
+const SIGNS:Record<HandleDir,[number,number]>={n:[0,1],s:[0,-1],e:[1,0],w:[-1,0],ne:[1,1],nw:[-1,1],se:[1,-1],sw:[-1,-1]}
+/** Cantos antes das arestas: onde as zonas se sobrepõem, o canto vence. */
+export const HANDLE_ORDER:HandleDir[]=['ne','nw','se','sw','n','s','e','w']
+
+/** Zonas de agarre em torno de um retângulo (metros): `out` para fora e `inn` para dentro das arestas. */
+export function handleZones(rect:Rect,out:number,inn:number):Zone[] {
+ const range=(s:number,lo:number,hi:number):[number,number]=>s<0?[lo-out,lo+inn]:s>0?[hi-inn,hi+out]:[lo+inn,hi-inn]
+ return HANDLE_ORDER.map(dir=>{
+  const [sx,sy]=SIGNS[dir],[x0,x1]=range(sx,rect.x,rect.x+rect.width),[y0,y1]=range(sy,rect.y,rect.y+rect.height)
+  return {dir,x0,x1,y0,y1}
+ })
+}
+const inRect=(r:Rect,p:Point)=>p.x>=r.x&&p.x<=r.x+r.width&&p.y>=r.y&&p.y<=r.y+r.height
+const rectDistance=(r:Rect,p:Point)=>Math.hypot(Math.max(r.x-p.x,0,p.x-(r.x+r.width)),Math.max(r.y-p.y,0,p.y-(r.y+r.height)))
+
+/**
+ * Prioridade: (1) alças do obstáculo selecionado; (2) ponto inicial; (3) obstáculo sob o ponteiro (o menor, se
+ * sobrepostos) ou, dentro da sala, o mais próximo a poucos pixels; (4) alças da sala, só sem obstáculo selecionado e
+ * com a faixa voltada para FORA da sala, para nunca engolir um obstáculo encostado na parede.
+ */
+export function hitTest(room:Room,p:Point,options:{ppu:number;touch?:boolean;selectedId:string|null;roomActive:boolean}):Hit {
+ const k=options.touch?HIT.touchScale:1,m=(px:number)=>px*k/options.ppu
+ const grab=(rect:Rect,outPx:number,inPx:number,target:string):Hit=>{
+  const inn=Math.min(inPx*k,Math.min(rect.width,rect.height)*options.ppu/3)/options.ppu
+  for(const z of handleZones(rect,m(outPx),inn))if(p.x>=z.x0&&p.x<=z.x1&&p.y>=z.y0&&p.y<=z.y1)return {kind:'handle',target,dir:z.dir}
+  return null
+ }
+ const selected=options.selectedId?room.obstacles.find(o=>o.id===options.selectedId):undefined
+ if(selected){const hit=grab(selected,HIT.handleOut,HIT.handleIn,selected.id);if(hit)return hit}
+ if(Math.hypot(p.x-room.start.x,p.y-room.start.y)<=m(HIT.start))return {kind:'start'}
+ let body:{id:string;area:number}|null=null
+ for(const o of room.obstacles)if(inRect(o,p)){const area=o.width*o.height;if(!body||area<=body.area)body={id:o.id,area}}
+ if(body)return {kind:'obstacle',id:body.id}
+ if(inRect({x:0,y:0,width:room.width,height:room.height},p)){
+  let near:{id:string;d:number}|null=null
+  for(const o of room.obstacles){const d=rectDistance(o,p);if(d<=m(HIT.obstacleTolerance)&&(!near||d<=near.d))near={id:o.id,d}}
+  if(near)return {kind:'obstacle',id:near.id}
+ }
+ if(options.roomActive)return grab({x:0,y:0,width:room.width,height:room.height},HIT.roomOut,HIT.roomIn,'room')
+ return null
+}
