@@ -2,34 +2,85 @@ import {alignForward} from './map-geometry'
 import {roomVector,traversable,type Room} from './room'
 import type {Point} from './tracker'
 
-// Experimental, reproducible sampling; noise is heuristic and is not calibrated uncertainty.
+type Particle = Point & {headingError:number}
+type Candidate = {particle:Particle;weight:number}
+const MAX_HEADING_ERROR = Math.PI * 70 / 180
+const clampHeading=(angle:number)=>Math.max(-MAX_HEADING_ERROR,Math.min(MAX_HEADING_ERROR,angle))
+
+/**
+ * Experimental map-aware estimator. Heading and speed uncertainty are heuristics,
+ * not calibrated probabilities. The map rules out impossible motion; it does
+ * not observe which side of an obstacle the user actually took.
+ */
 export class MapMatcher {
- private particles:Point[]
+ private particles:Particle[]
  private randomState=0x13579bdf
  private output:Point
  private failed=false
  private room:Room
  private count:number
- constructor(room:Room,count=128){this.room=room;this.count=count;this.particles=Array.from({length:count},()=>({...room.start}));this.output={...room.start}}
+ private mapConstrained=false
+ constructor(room:Room,count=128){
+  if(!Number.isInteger(count)||count<1)throw new Error('Quantidade de hipóteses inválida')
+  this.room=room;this.count=count;this.output={...room.start}
+  this.particles=Array.from({length:count},()=>({...room.start,headingError:clampHeading(this.normal()*0.18)}))
+ }
  private random():number {this.randomState=(Math.imul(1664525,this.randomState)+1013904223)>>>0;return (this.randomState+.5)/4294967296}
  private normal():number {return Math.sqrt(-2*Math.log(this.random()))*Math.cos(2*Math.PI*this.random())}
+ get constrained():boolean{return this.mapConstrained}
  step(delta:Point):Point|null {
   if(this.failed)return null
   const distance=Math.hypot(delta.x,delta.y)
   if(!Number.isFinite(distance)){this.failed=true;return null}
+  // No artificial repulsion or motion when the sensor model predicts no movement.
   if(distance===0)return {...this.output}
-  const sigma=distance*0.2,candidates:Point[]=[]
-  for(const p of this.particles){const next={x:p.x+delta.x+this.normal()*sigma,y:p.y+delta.y+this.normal()*sigma};if(traversable(this.room,p,next))candidates.push(next)}
-  const reachable=candidates.filter(p=>traversable(this.room,this.output,p))
-  if(!reachable.length){this.failed=true;return null}
-  const mean=reachable.reduce((acc,p)=>({x:acc.x+p.x/reachable.length,y:acc.y+p.y/reachable.length}),{x:0,y:0})
-  const chosen=reachable.reduce((best,p)=>Math.hypot(p.x-mean.x,p.y-mean.y)<Math.hypot(best.x-mean.x,best.y-mean.y)?p:best)
-  this.output={...chosen}
-  this.particles=Array.from({length:this.count},()=>({...candidates[Math.floor(this.random()*candidates.length)]}))
+  const desired={x:this.output.x+delta.x,y:this.output.y+delta.y}
+  if(!traversable(this.room,this.output,desired))this.mapConstrained=true
+  const candidates:Candidate[]=[]
+  for(const p of this.particles){
+   const heading=clampHeading(p.headingError+this.normal()*0.035*Math.sqrt(distance))
+   const scale=Math.max(0.55,Math.min(1.45,1+this.normal()*0.10))
+   const propose=(angle:number,weight:number):boolean=>{
+    const adjusted=clampHeading(angle),c=Math.cos(adjusted),s=Math.sin(adjusted)
+    const next:Particle={x:p.x+scale*(c*delta.x-s*delta.y),y:p.y+scale*(s*delta.x+c*delta.y),headingError:adjusted}
+    // Both checks are needed: preserve a feasible particle history AND avoid a
+    // visible jump across an obstacle from the last displayed estimate.
+    if(!traversable(this.room,p,next)||!traversable(this.room,this.output,next))return false
+    candidates.push({particle:next,weight});return true
+   }
+   if(!propose(heading,1)){
+    this.mapConstrained=true
+    // Competing left/right alternatives are possible hypotheses, not evidence
+    // of a real collision, turn or return. Their lower weight reflects their
+    // greater disagreement with the model's proposed direction.
+    for(const [turn,weight] of [[Math.PI/6,0.16],[-Math.PI/6,0.16],[Math.PI/3,0.025],[-Math.PI/3,0.025]]){
+     if(Math.abs(heading+turn)<=MAX_HEADING_ERROR)propose(heading+turn,weight)
+    }
+   }
+  }
+  if(!candidates.length){this.failed=true;return null}
+  const total=candidates.reduce((sum,c)=>sum+c.weight,0)
+  const mean=candidates.reduce((acc,c)=>({x:acc.x+c.particle.x*c.weight/total,y:acc.y+c.particle.y*c.weight/total}),{x:0,y:0})
+  // A mean between two modes can lie inside an obstacle. Never draw such a
+  // shortcut: fall back to an actually reachable particle in that case.
+  if(!this.mapConstrained)this.output=desired
+  else if(traversable(this.room,this.output,mean))this.output=mean
+  else {
+   const closest=candidates.reduce((best,c)=>Math.hypot(c.particle.x-mean.x,c.particle.y-mean.y)<Math.hypot(best.particle.x-mean.x,best.particle.y-mean.y)?c:best)
+   this.output={x:closest.particle.x,y:closest.particle.y}
+  }
+  // Systematic weighted resampling; all candidates are reachable from output's
+  // previous position, so later updates cannot jump between disconnected modes.
+  const start=this.random()*total/this.count;let index=0,cumulative=candidates[0].weight
+  this.particles=Array.from({length:this.count},(_,i)=>{
+   const target=start+i*total/this.count
+   while(index<candidates.length-1&&cumulative<target){index++;cumulative+=candidates[index].weight}
+   return {...candidates[index].particle}
+  })
   return {...this.output}
  }
 }
-export type MatchedPath={raw:Point[];corrected:Point[];lost:boolean}
+export type MatchedPath={raw:Point[];corrected:Point[];lost:boolean;constrained:boolean}
 /** Incrementally applies one local-to-room transform and map filter per session. */
 export class RoomPath {
  private matcher:MapMatcher
@@ -41,7 +92,7 @@ export class RoomPath {
  constructor(room:Room){this.room=room;this.matcher=new MapMatcher(room)}
  update(points:Point[]):MatchedPath {
   const aligned=alignForward(points)
-  if(!aligned)return {raw:[],corrected:[],lost:false}
+  if(!aligned)return {raw:[],corrected:[],lost:false,constrained:false}
   const world=aligned.map(p=>{const v=roomVector(p,this.room.heading);return {x:this.room.start.x+v.x,y:this.room.start.y+v.y}})
   if(!this.processed){this.raw=[world[0]];this.corrected=[world[0]];this.processed=1}
   while(this.processed<world.length){
@@ -50,6 +101,6 @@ export class RoomPath {
    if(!this.lost){const p=this.matcher.step({x:next.x-previous.x,y:next.y-previous.y});if(p)this.corrected.push(p);else this.lost=true}
    this.processed++
   }
-  return {raw:[...this.raw],corrected:[...this.corrected],lost:this.lost}
+  return {raw:[...this.raw],corrected:[...this.corrected],lost:this.lost,constrained:this.matcher.constrained}
  }
 }
