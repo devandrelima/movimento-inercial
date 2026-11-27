@@ -6,10 +6,11 @@ import type {MatchedPath} from './map-match'
 
 type Point = { x: number; y: number }
 type Gesture = {scale:number;offset:Point;center:Point;distance:number}
+const TAP_SLOP=8
 const MIN_SCALE=12,MAX_SCALE=192,INITIAL_SCALE=48
 const clamp=(value:number)=>Math.max(MIN_SCALE,Math.min(MAX_SCALE,value))
 
-export default function Map({ resetKey, segments, room, matched, goal, route, onEditRoom, onOpenMaps, locked, limited=false }: { resetKey:number;segments:Segment[];room:Room|null;matched:MatchedPath|null;goal:Point|null;route:Point[]|null;onEditRoom:()=>void;onOpenMaps:()=>void;locked:boolean;limited?:boolean }) {
+export default function Map({ resetKey, segments, room, matched, goal, route, onPickGoal, onEditRoom, onOpenMaps, locked, limited=false }: { resetKey:number;segments:Segment[];room:Room|null;matched:MatchedPath|null;goal:Point|null;route:Point[]|null;onPickGoal:(point:Point)=>string|null;onEditRoom:()=>void;onOpenMaps:()=>void;locked:boolean;limited?:boolean }) {
   const map = useRef<HTMLElement>(null)
   const offset = useRef<Point>({x:0,y:0})
   const scale = useRef(INITIAL_SCALE)
@@ -17,6 +18,8 @@ export default function Map({ resetKey, segments, room, matched, goal, route, on
   const gesture=useRef<Gesture|null>(null)
   const [pixelsPerMeter,setPixelsPerMeter]=useState(INITIAL_SCALE)
   const [notice,setNotice]=useState<'edit'|'maps'|null>(null)
+  const [goalNotice,setGoalNotice]=useState<string|null>(null)
+  const tap=useRef<{id:number;x:number;y:number}|null>(null),goalTimer=useRef(0)
   const aligned=room ? [{id:1,points:matched?.corrected?.map(p=>({x:p.x-room.start.x,y:p.y-room.start.y}))??null}] : segments.map(segment=>({id:segment.id,points:alignForward(segment.points)}))
   const awaiting=segments.length===0 || aligned[aligned.length-1].points===null || aligned[aligned.length-1].points?.length===0
   function exportPaths() {
@@ -46,7 +49,7 @@ export default function Map({ resetKey, segments, room, matched, goal, route, on
     element.addEventListener('wheel',wheel,{passive:false})
     return ()=>element.removeEventListener('wheel',wheel)
   },[])
-  useEffect(()=>{pointers.current.clear();gesture.current=null;moveTo({x:0,y:0});scale.current=INITIAL_SCALE;setPixelsPerMeter(INITIAL_SCALE);setNotice(null)},[resetKey])
+  useEffect(()=>{pointers.current.clear();tap.current=null;gesture.current=null;moveTo({x:0,y:0});scale.current=INITIAL_SCALE;setPixelsPerMeter(INITIAL_SCALE);setNotice(null)},[resetKey])
   function beginGesture() {
     const points=[...pointers.current.values()]
     if(!points.length){gesture.current=null;return}
@@ -58,9 +61,12 @@ export default function Map({ resetKey, segments, room, matched, goal, route, on
     if(event.pointerType==='mouse' && event.button!==0)return
     if(pointers.current.size>=2)return
     pointers.current.set(event.pointerId,relative(event.clientX,event.clientY));event.currentTarget.setPointerCapture(event.pointerId);beginGesture()
+    // Um toque (sem arrastar nem pinça) escolhe o destino ao soltar.
+    tap.current=pointers.current.size===1?{id:event.pointerId,x:event.clientX,y:event.clientY}:null
   }
   function move(event:PointerEvent<HTMLElement>) {
     if(!pointers.current.has(event.pointerId))return
+    if(tap.current&&(tap.current.id!==event.pointerId||Math.hypot(event.clientX-tap.current.x,event.clientY-tap.current.y)>TAP_SLOP))tap.current=null
     pointers.current.set(event.pointerId,relative(event.clientX,event.clientY))
     const initial=gesture.current,points=[...pointers.current.values()]
     if(!initial)return
@@ -72,6 +78,16 @@ export default function Map({ resetKey, segments, room, matched, goal, route, on
     moveTo({x:adjusted.x+center.x-initial.center.x,y:adjusted.y+center.y-initial.center.y});scale.current=value;setPixelsPerMeter(value)
   }
   function end(event:PointerEvent<HTMLElement>) {if(pointers.current.delete(event.pointerId))beginGesture()}
+  function flashGoal(message:string){setGoalNotice(message);window.clearTimeout(goalTimer.current);goalTimer.current=window.setTimeout(()=>setGoalNotice(null),4500)}
+  function up(event:PointerEvent<HTMLElement>) {
+    const t=tap.current;tap.current=null
+    if(t&&t.id===event.pointerId&&room&&!locked){
+      const p=relative(event.clientX,event.clientY)
+      const error=onPickGoal({x:room.start.x+(p.x-offset.current.x)/scale.current,y:room.start.y-(p.y-offset.current.y)/scale.current})
+      if(error)flashGoal(error+(goal?' O destino anterior continua ativo.':''));else {window.clearTimeout(goalTimer.current);setGoalNotice(null)}
+    }
+    end(event)
+  }
   function keyboard(event:KeyboardEvent<HTMLElement>) {
     if(event.target!==event.currentTarget)return
     const direction:Record<string,Point>={ArrowLeft:{x:48,y:0},ArrowRight:{x:-48,y:0},ArrowUp:{x:0,y:48},ArrowDown:{x:0,y:-48}}
@@ -80,7 +96,7 @@ export default function Map({ resetKey, segments, room, matched, goal, route, on
     if(event.key==='+' || event.key==='='){event.preventDefault();setZoom(scale.current*1.25)}
     if(event.key==='-'){event.preventDefault();setZoom(scale.current/1.25)}
   }
-  return <section ref={map} className="field" style={{'--grid-size':`${pixelsPerMeter}px`,'--grid-half':`${pixelsPerMeter/2}px`} as React.CSSProperties} role="region" tabIndex={0} aria-label="Plano de trajetória. Arraste para navegar; use os botões ou gesto de pinça para ajustar o zoom." onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end} onKeyDown={keyboard}>
+  return <section ref={map} className="field" style={{'--grid-size':`${pixelsPerMeter}px`,'--grid-half':`${pixelsPerMeter/2}px`} as React.CSSProperties} role="region" tabIndex={0} aria-label="Plano de trajetória. Arraste para navegar; use os botões ou gesto de pinça para ajustar o zoom." onPointerDown={start} onPointerMove={move} onPointerUp={up} onPointerCancel={end} onLostPointerCapture={end} onKeyDown={keyboard}>
     <div className="field-top"><span>Plano de trajetória</span><span>Grade: 1 m × 1 m</span></div>
     <div className="room-map-actions" onPointerDown={event=>event.stopPropagation()}>
       <button onClick={()=>{if(locked){setNotice('edit');return}setNotice(null);onEditRoom()}}>{room?'Editar sala':'Criar sala'}</button>
@@ -110,6 +126,6 @@ export default function Map({ resetKey, segments, room, matched, goal, route, on
     </svg>
     <div className="crosshair"><div className="origin"/><span>Origem</span></div>
     <div className="field-foot"><span>X →</span><span>Y ↑</span></div>
-    {(notice||(awaiting&&!limited)) && <p className="model-note">{notice==='edit'?'Para editar a sala, primeiro reinicie a sessão.':notice==='maps'?'Para trocar o mapa, primeiro reinicie a sessão.':room?'Ao iniciar, caminhe em linha reta na direção da seta.':'Ao iniciar, caminhe em linha reta para definir a frente.'}</p>}
+    {(goalNotice||notice||(awaiting&&!limited)) && <p className="model-note">{goalNotice?goalNotice:notice==='edit'?'Para editar a sala, primeiro reinicie a sessão.':notice==='maps'?'Para trocar o mapa, primeiro reinicie a sessão.':room?'Ao iniciar, caminhe em linha reta na direção da seta.':'Ao iniciar, caminhe em linha reta para definir a frente.'}</p>}
   </section>
 }
