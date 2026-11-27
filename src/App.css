@@ -81,3 +81,14 @@
 
 .route-settings{border-bottom:1px solid #e6eeee;padding-bottom:20px;margin-bottom:20px}.route-settings summary{font-size:14px;font-weight:700;color:#23666c;cursor:pointer}.route-settings p{font-size:12px;line-height:1.5;color:#526f73;margin-top:8px}.route-controls{display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin-top:10px}.route-controls label{display:grid;gap:4px;font-size:12px;color:#526f73}.route-controls input{width:78px;padding:8px;border:1px solid #b7cbca;border-radius:4px;font:inherit}.route-controls button{min-height:36px;border-radius:4px;padding:0 10px;background:#eaf1f1;color:#23666c}.route-controls button:disabled,.route-controls input:disabled{opacity:.55}
 .instrument-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}.retest{background:none;color:#126c70;font-size:12px;font-weight:600;padding:2px 0;text-decoration:underline}
+/* Mapa girável: a trajetória e a sala ficam em .map-world (deslocamento + rotação); a grade é um elemento próprio,
+   centrado na tela e girado, com background-position acompanhando a origem (grade infinita em qualquer ângulo). */
+.field{background-image:none}
+.field-grid{position:absolute;left:50%;top:50%;width:var(--grid-d,2400px);height:var(--grid-d,2400px);margin:calc(var(--grid-d,2400px)/-2) 0 0 calc(var(--grid-d,2400px)/-2);pointer-events:none;background-image:linear-gradient(#e6efed 1px,transparent 1px),linear-gradient(90deg,#e6efed 1px,transparent 1px);background-size:var(--grid-size,48px) var(--grid-size,48px);background-position:calc(50% + var(--grid-half,24px) + var(--gx,0px)) calc(50% + var(--grid-half,24px) + var(--gy,0px));transform:rotate(var(--rot,0deg))}
+.map-world{position:absolute;left:50%;top:50%;width:0;height:0;transform:translate(var(--pan-x,0px),var(--pan-y,0px)) rotate(var(--rot,0deg));pointer-events:none}
+.map-world .trajectory-layer{left:0;top:0}
+.field.is-rotated .field-foot{display:none}
+.map-compass{position:absolute;right:18px;top:188px;width:42px;height:42px;padding:0;display:grid;place-items:center;background:#fff;border:1px solid #dce7e9;border-radius:50%;box-shadow:0 2px 8px #16383b14;z-index:1;touch-action:manipulation}
+.compass-needle{transform-origin:12px 12px;transform:rotate(var(--rot,0deg))}
+.map-compass:focus-visible{outline:2px solid #d59c30;outline-offset:2px}
+@media(max-width:767px){.shell .map-compass{top:138px;right:10px}}

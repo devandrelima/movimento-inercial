@@ -17,7 +17,7 @@ async page => {
  await page.evaluate(()=>clearInterval(window.checkFeed));await page.getByRole('button',{name:'Iniciar',exact:true}).click();await page.getByRole('button',{name:'Iniciar coleta'}).waitFor({timeout:10000})
 
  const field=page.locator('.field'),box=await field.boundingBox()
- const scale=await field.evaluate(e=>parseFloat(getComputedStyle(e).backgroundSize))
+ const scale=await field.evaluate(e=>parseFloat(e.dataset.pxPerM))
  const at=(x,y)=>({x:box.x+box.width/2+x*scale,y:box.y+box.height/2-y*scale}) // origem da sala (0,0) no centro do mapa
  const goals=()=>page.getByLabel('Destino',{exact:true})
  const near=(a,b,what)=>{if(Math.abs(a-b)>2)throw Error(what+': '+a+' vs '+b)}

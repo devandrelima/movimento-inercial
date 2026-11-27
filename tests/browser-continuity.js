@@ -20,7 +20,7 @@ async page => {
  await page.evaluate(()=>window.testFire(3600));await page.waitForTimeout(1200);
  const line=page.locator('.trajectory-layer polyline');
  if(await line.count()!==1)throw Error('Não há um traço: '+await page.locator('.model-status').innerText());
- const read=async()=>{const scale=await page.locator('.field').evaluate(e=>parseFloat(getComputedStyle(e).backgroundSize));const p=await line.getAttribute('points');return p.split(' ').map(s=>s.split(',').map(Number).map(n=>n/scale))};
+ const read=async()=>{const scale=await page.locator('.field').evaluate(e=>parseFloat(e.dataset.pxPerM));const p=await line.getAttribute('points');return p.split(' ').map(s=>s.split(',').map(Number).map(n=>n/scale))};
  const status=await page.locator('.model-status').innerText();if(status!=='Estimando trajetória')throw Error('Estado inesperado: '+status);
  const text=await page.locator('body').innerText();for(const forbidden of ['janelas preparadas','IA v2 experimental','Estimativa experimental',' Hz'])if(text.includes(forbidden))throw Error('Texto indesejado: '+forbidden);
  const before=await read();

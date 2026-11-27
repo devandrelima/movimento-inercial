@@ -54,7 +54,7 @@ async page => {
  await page.evaluate(()=>window.testFire(3600));await page.waitForTimeout(1200);
  const line=page.locator('.trajectory-layer polyline');if(await line.count()!==1)throw Error('Trajetória com mapa não apareceu');
  const corrected=await line.getAttribute('points');if(corrected.split(' ').length<3)throw Error('Trajetória corrigida vazia');
- const scale=await page.locator('.field').evaluate(e=>parseFloat(getComputedStyle(e).backgroundSize));
+ const scale=await page.locator('.field').evaluate(e=>parseFloat(e.dataset.pxPerM));
  const points=corrected.split(' ').map(v=>{const [x,y]=v.split(',').map(Number);return{x:x/scale+1,y:1-y/scale}});
  for(const p of points)if(p.x<0||p.x>10||p.y<0||p.y>8||(p.x>=4&&p.x<=6&&p.y>=3&&p.y<=5))throw Error('Ponto corrigido fora da área livre: '+JSON.stringify(p));
  // Seta na ponta da trajetória: posição na última coordenada e giro conforme o último trecho.

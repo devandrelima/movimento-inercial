@@ -18,7 +18,7 @@ async page => {
 
  const field=page.locator('.field'),box=await field.boundingBox()
  // metros (referencial da sala) -> pixels da tela: origem = ponto inicial da sala, no centro do mapa
- const scale=await field.evaluate(e=>parseFloat(getComputedStyle(e).backgroundSize))
+ const scale=await field.evaluate(e=>parseFloat(e.dataset.pxPerM))
  const at=(x,y)=>({x:box.x+box.width/2+(x-2.5)*scale,y:box.y+box.height/2-(y-4)*scale})
  const goals=()=>page.getByLabel('Destino',{exact:true})
  const summary=()=>page.locator('.route-settings summary').innerText()
