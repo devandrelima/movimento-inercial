@@ -58,10 +58,22 @@ async page => {
  s=await state();if(s.check)throw Error('Aprovação deveria ter sido apagada')
  results.refazerTeste='volta ao teste'
 
- // 7) Falhar no teste não é lembrado.
+ // 7) Aparelho incompatível: a reprovação é lembrada; reabrir vai direto ao mapa sem sensores, sem testar de novo.
  await page.getByRole('button',{name:'Testar sensores'}).click();await page.getByRole('alert').waitFor({timeout:9000})
- s=await state();if(s.check)throw Error('Teste reprovado não deveria ser lembrado')
- await page.reload();await page.getByRole('button',{name:'Testar sensores'}).waitFor({timeout:10000})
- results.reprovado='não é lembrado'
+ s=await state();if(!s.check||JSON.parse(s.check).ok!==false)throw Error('Reprovação deveria ser lembrada: '+s.check)
+ modelRequests.length=0;await page.reload()
+ await page.getByRole('button',{name:'Iniciar coleta'}).waitFor({timeout:15000})
+ if(await page.getByRole('button',{name:'Testar sensores'}).count())throw Error('Aparelho incompatível não deveria ser testado de novo')
+ if(await page.getByRole('button',{name:'Iniciar coleta'}).getAttribute('aria-disabled')!=='true')throw Error('Play deveria estar desabilitado')
+ await page.waitForTimeout(1500);if(modelRequests.length)throw Error('Modelo não deveria ser baixado em aparelho incompatível')
+ await page.reload();await page.getByRole('button',{name:'Iniciar coleta'}).waitFor({timeout:15000});if(await page.getByRole('button',{name:'Testar sensores'}).count())throw Error('Testou de novo na terceira visita')
+ results.incompativel='lembrado: abre direto no mapa sem sensores, sem teste e sem baixar o modelo'
+
+ // 8) Pelo botão "Refazer teste" o aparelho pode ser testado de novo (e, se passar, o resultado positivo substitui o negativo).
+ await page.getByRole('button',{name:'Refazer teste'}).click();await page.getByRole('button',{name:'Testar sensores'}).waitFor({timeout:10000})
+ await page.getByRole('button',{name:'Testar sensores'}).click();await feed()
+ await page.getByRole('button',{name:'Iniciar',exact:true}).waitFor({timeout:9000});await page.evaluate(()=>clearInterval(window.checkFeed))
+ s=await state();if(JSON.parse(s.check).ok!==true)throw Error('Aprovação deveria substituir a reprovação')
+ results.refazerAposReprovacao='aprovado substitui o negativo'
  return results
 }

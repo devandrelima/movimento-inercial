@@ -22,6 +22,7 @@ export default function Compatibility({onStart,onSkip}:{onStart:()=>void;onSkip:
   if(run!==token.current)return
   if(permission.motion!=='granted' || permission.orientation!=='granted') {
    const denied=permission.motion==='denied'||permission.orientation==='denied'
+   saveDeviceCheck(false)
    setFailure(denied?'Permissão de movimento ou orientação negada. Verifique as permissões do navegador e tente novamente.':'Sensores de movimento ou orientação indisponíveis neste navegador. Acesse pelo celular usando HTTPS.')
    setState('failure');return
   }
@@ -33,8 +34,8 @@ export default function Compatibility({onStart,onSkip}:{onStart:()=>void;onSkip:
    const left=Math.max(0,Math.ceil((TEST_SECONDS*1000-(performance.now()-start))/1000));setRemaining(left)
    if(left>0)return
    cleanup.current();const result=check.result()
-   if(result.compatible){saveDeviceCheck();setState('success')}
-   else {setFailure(`Não recebemos leituras suficientes: ${result.missing.join(', ')}. Confira as permissões e tente novamente.`);setState('failure')}
+   if(result.compatible){saveDeviceCheck(true);setState('success')}
+   else {saveDeviceCheck(false);setFailure(`Não recebemos leituras suficientes: ${result.missing.join(', ')}. Confira as permissões e tente novamente.`);setState('failure')}
   },100)
   cleanup.current=()=>{window.clearInterval(timer);window.removeEventListener('devicemotion',motion);window.removeEventListener('deviceorientation',orientation)}
   setState('testing')
@@ -50,7 +51,7 @@ export default function Compatibility({onStart,onSkip}:{onStart:()=>void;onSkip:
     {state==='failure' && <p className="compat-error" role="alert">{failure}</p>}
     {(state==='idle'||state==='failure') && <button className="compat-primary" onClick={startTest}>{state==='idle'?'Testar sensores':'Tentar novamente'}<span aria-hidden="true">→</span></button>}
     {state==='success' && <button className="compat-primary" onClick={onStart}>Iniciar <span aria-hidden="true">→</span></button>}
-    {state==='failure' && <><p className="compat-fallback">Você ainda pode abrir os mapas para criar, editar e carregar mapas públicos, mas a trajetória não funcionará neste aparelho.</p><button className="compat-secondary" onClick={onSkip}>Abrir os mapas sem sensores</button></>}
+    {state==='failure' && <><p className="compat-fallback">Você ainda pode abrir os mapas para criar, editar e carregar mapas públicos, mas a trajetória não funcionará neste aparelho.</p><button className="compat-secondary" onClick={()=>{saveDeviceCheck(false);onSkip()}}>Abrir os mapas sem sensores</button></>}
    </div>
   </div>
  </div></main>

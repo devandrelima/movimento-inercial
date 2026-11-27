@@ -6,7 +6,7 @@ A aplicação publicada está em [embarcado.bemaqui.online](https://embarcado.be
 
 ## Funcionalidades
 
-- Teste de compatibilidade dos sensores e permissões antes do uso (3 segundos), lembrado no navegador junto com o modelo instalado: nas visitas seguintes o app abre direto na grade quando o modelo instalado é o atual. Se o aparelho não passar, ainda é possível abrir o mapa, com play e reset desabilitados, para criar, editar e carregar mapas.
+- Teste de compatibilidade dos sensores e permissões antes do uso (3 segundos), o resultado (aprovado ou reprovado) é lembrado no navegador, junto com o modelo instalado: nas visitas seguintes o app abre direto na grade quando o modelo instalado é o atual, ou direto no mapa sem sensores se o aparelho já foi reprovado (há um botão para refazer o teste). Se o aparelho não passar, ainda é possível abrir o mapa, com play e reset desabilitados, para criar, editar e carregar mapas.
 - Mapas públicos: qualquer pessoa carrega os mapas da lista; publicar, atualizar e excluir exigem login. Veja [mapas públicos](docs/mapas-publicos.md).
 - Leitura de aceleração com gravidade, giroscópio e orientação; aquisição e inferência locais, sem GPS ou câmera.
 - Pré-processamento a 50 Hz e inferência com o modelo RoNIN v2 float32 no navegador, usando LiteRT.js e WebAssembly.
