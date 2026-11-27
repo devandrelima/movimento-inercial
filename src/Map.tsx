@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import type {Segment} from './tracker'
-import {alignForward,applyGesture,gesturePose,gridStep,headingAngle,initialView,rotateAbout,screenToLayer,wrapAngle,zoomOffset,type GesturePose,type View} from './map-geometry'
+import {alignInfo,applyGesture,gesturePose,gridStep,headingAngle,initialView,rotateAbout,screenToLayer,wrapAngle,zoomOffset,type GesturePose,type View} from './map-geometry'
 import {roomAngle,roomVector,type Room} from './room'
 import type {MatchedPath} from './map-match'
 
@@ -25,7 +25,7 @@ export default function Map({ resetKey, segments, room, matched, goal, route, on
   const [goalNotice,setGoalNotice]=useState<string|null>(null)
   const tap=useRef<{id:number;x:number;y:number}|null>(null),goalTimer=useRef(0)
   const grid=gridStep(pixelsPerMeter,10)
-  const aligned=room ? [{id:1,points:matched?.corrected?.map(p=>({x:p.x-room.start.x,y:p.y-room.start.y}))??null}] : segments.map(segment=>({id:segment.id,points:alignForward(segment.points)}))
+  const aligned=room ? [{id:1,provisional:matched?.provisional??false,points:matched?.corrected?.map(p=>({x:p.x-room.start.x,y:p.y-room.start.y}))??null}] : segments.map(segment=>{const info=alignInfo(segment.points);return {id:segment.id,provisional:info?!info.final:false,points:info?.points??null}})
   const awaiting=segments.length===0 || aligned[aligned.length-1].points===null || aligned[aligned.length-1].points?.length===0
   function exportPaths() {
     if(!matched?.raw.length)return
@@ -168,7 +168,8 @@ export default function Map({ resetKey, segments, room, matched, goal, route, on
       {aligned.map((segment,index)=>{
         if(!segment.points)return null
         const last=segment.points[segment.points.length-1],heading=segment.points.length>1?headingAngle(segment.points):null
-        return <g key={segment.id} opacity={index===aligned.length-1?1:0.35}>
+        // Trecho com a direção ainda provisória (menos de 1 m): mais claro, até a direção ser confirmada
+        return <g key={segment.id} opacity={index===aligned.length-1?(segment.provisional?0.55:1):0.35} data-provisional={segment.provisional||undefined}>
           <polyline points={segment.points.map(point=>`${point.x*pixelsPerMeter},${-point.y*pixelsPerMeter}`).join(' ')} fill="none" stroke="#087a80" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
           {segment.points.length>1 && (heading===null
             ? <circle cx={last.x*pixelsPerMeter} cy={-last.y*pixelsPerMeter} r="5" fill="#087a80" stroke="white" strokeWidth="2"/>

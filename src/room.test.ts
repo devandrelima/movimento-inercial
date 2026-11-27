@@ -48,7 +48,7 @@ describe('direção da frente em qualquer ângulo',()=>{
 describe('traçado incremental com alinhamento provisório',()=>{
  it('alimentar aos poucos (provisório → final) dá o mesmo resultado que calcular tudo de uma vez',()=>{
   const open:Room={...DEFAULT_ROOM,width:30,height:30,start:{x:15,y:15},heading:'up',obstacles:[]}
-  const walk=[{x:0,y:0},{x:0.06,y:0.1},{x:0.13,y:0.27},{x:0.2,y:0.45},{x:0.32,y:0.62},{x:0.4,y:0.85},{x:0.52,y:1.1},{x:0.6,y:1.4}]
+  const walk=[{x:0,y:0},{x:0.06,y:0.1},{x:0.13,y:0.27},{x:0.2,y:0.45},{x:0.32,y:0.62},{x:0.4,y:0.85},{x:0.52,y:1.1},{x:0.6,y:1.4},{x:0.7,y:1.8}]
   const incremental=new RoomPath(open);let last
   for(let n=1;n<=walk.length;n++)last=incremental.update(walk.slice(0,n))
   const once=new RoomPath(open).update(walk)
@@ -56,11 +56,13 @@ describe('traçado incremental com alinhamento provisório',()=>{
   last!.raw.forEach((p,i)=>{expect(p.x).toBeCloseTo(once.raw[i].x,9);expect(p.y).toBeCloseTo(once.raw[i].y,9)})
   last!.corrected.forEach((p,i)=>{expect(p.x).toBeCloseTo(once.corrected[i].x,9);expect(p.y).toBeCloseTo(once.corrected[i].y,9)})
  })
- it('começa a desenhar assim que há 25 cm de deslocamento, antes dos 75 cm da âncora final',()=>{
+ it('começa a desenhar assim que há 30 cm de deslocamento, antes de 1 m da âncora final',()=>{
   const open:Room={...DEFAULT_ROOM,width:30,height:30,start:{x:15,y:15},heading:'up',obstacles:[]}
   const path=new RoomPath(open)
   expect(path.update([{x:0,y:0},{x:0.1,y:0.1}]).raw).toHaveLength(0)
-  expect(path.update([{x:0,y:0},{x:0.1,y:0.1},{x:0.05,y:0.3}]).raw.length).toBeGreaterThan(1)
+  const early=path.update([{x:0,y:0},{x:0.1,y:0.1},{x:0.05,y:0.35}])
+  expect(early.raw.length).toBeGreaterThan(1);expect(early.provisional).toBe(true)
+  expect(path.update([{x:0,y:0},{x:0.1,y:0.1},{x:0.05,y:0.35},{x:0.1,y:1.05}]).provisional).toBe(false)
  })
 })
 describe('filtro de mapa experimental',()=>{

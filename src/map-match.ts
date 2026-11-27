@@ -86,7 +86,8 @@ export class MapMatcher {
   return {...this.output}
  }
 }
-export type MatchedPath={raw:Point[];corrected:Point[];lost:boolean;constrained:boolean;route:Point[]|null}
+/** `provisional`: a direção inicial ainda não foi confirmada (menos de 1 m de percurso). */
+export type MatchedPath={raw:Point[];corrected:Point[];lost:boolean;constrained:boolean;route:Point[]|null;provisional?:boolean}
 /** Incrementally applies one local-to-room transform and map filter per session. */
 export class RoomPath {
  private matcher:MapMatcher
@@ -98,12 +99,13 @@ export class RoomPath {
  private route:Point[]|null
  private goal:Point|null
  private offRoute=0
- constructor(room:Room,goal:Point|null=null){this.room=room;this.goal=goal;this.matcher=new MapMatcher(room);this.route=goal?planRoute(room,room.start,goal):null;this.matcher.setRoute(this.route)}
+ constructor(room:Room,goal:Point|null=null){this.room=room;this.goal=goal;this.matcher=new MapMatcher(room);this.route=goal?planRoute(room,room.start,goal):null;this.initialRoute=this.route;this.matcher.setRoute(this.route)}
  private anchor=-1
  private anchorFinal=false
+ private initialRoute:Point[]|null
  private restart(){
   // A nova âncora (provisória → final) muda a direção de todo o trecho já calculado: recomeça do zero.
-  this.matcher=new MapMatcher(this.room);this.route=this.goal?planRoute(this.room,this.room.start,this.goal):null;this.matcher.setRoute(this.route)
+  this.matcher=new MapMatcher(this.room);this.route=this.initialRoute;this.matcher.setRoute(this.route)
   this.raw=[];this.corrected=[];this.processed=0;this.lost=false;this.offRoute=0
  }
  update(points:Point[]):MatchedPath {
@@ -125,6 +127,6 @@ export class RoomPath {
    }else this.lost=true}
    this.processed++
   }
-  return {raw:[...this.raw],corrected:[...this.corrected],lost:this.lost,constrained:this.matcher.constrained,route:this.route}
+  return {raw:[...this.raw],corrected:[...this.corrected],lost:this.lost,constrained:this.matcher.constrained,route:this.route,provisional:!this.anchorFinal}
  }
 }

@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest'
-import {alignForward,alignInfo,applyGesture,gesturePose,gridStep,headingAngle,initialView,rotateAbout,rotateVector,screenToLayer,wrapAngle,zoomOffset,type View} from './map-geometry'
+import {alignForward,alignInfo,applyGesture,fitScaleForRotation,gesturePose,gridStep,headingAngle,initialView,rotateAbout,rotateVector,screenToLayer,wrapAngle,zoomOffset,type View} from './map-geometry'
 describe('mapa',()=>{
  it('usa o primeiro deslocamento para cima e preserva esquerda e direita',()=>{
   const result=alignForward([{x:0,y:0},{x:1,y:0},{x:1,y:-1},{x:1,y:1}])!
@@ -57,16 +57,21 @@ describe('grade e vista inicial para salas grandes',()=>{
 })
 
 describe('alinhamento provisório da direção inicial',()=>{
- it('com 25 cm de deslocamento já define uma direção provisória e desenha',()=>{
-  const info=alignInfo([{x:0,y:0},{x:0.05,y:0.08},{x:0,y:0.3}])!
-  expect(info.final).toBe(false);expect(info.anchorIndex).toBe(2);expect(info.points[2].x).toBeCloseTo(0);expect(info.points[2].y).toBeCloseTo(0.3)
-  expect(alignInfo([{x:0,y:0},{x:0.1,y:0.1}])).toBeNull()
+ it('com 30 cm de percurso já define uma direção provisória (o ponto mais distante) e desenha',()=>{
+  const info=alignInfo([{x:0,y:0},{x:0.05,y:0.08},{x:0,y:0.31}])!
+  expect(info.final).toBe(false);expect(info.anchorIndex).toBe(2);expect(info.points[2].x).toBeCloseTo(0);expect(info.points[2].y).toBeCloseTo(0.31)
+  expect(alignInfo([{x:0,y:0},{x:0.1,y:0.1}])).toBeNull();expect(alignInfo([{x:0,y:0},{x:0.2,y:0.1}])).toBeNull()
  })
- it('com 75 cm a âncora passa a ser a final e o desenho se reorienta por ela',()=>{
-  const pts=[{x:0,y:0},{x:0.1,y:0.25},{x:0.3,y:0.5},{x:0.6,y:0.9}]
-  const provisional=alignInfo(pts.slice(0,2))!,final=alignInfo(pts)!
+ it('enquanto provisória, a âncora acompanha a ponta (o desenho gira aos poucos, sem salto)',()=>{
+  const a=alignInfo([{x:0,y:0},{x:0.1,y:0.3}])!,b=alignInfo([{x:0,y:0},{x:0.1,y:0.3},{x:0.25,y:0.55}])!
+  expect(a.anchorIndex).toBe(1);expect(b.anchorIndex).toBe(2);expect(a.final).toBe(false);expect(b.final).toBe(false)
+ })
+ it('com 1 m a âncora passa a ser a final e a direção congela',()=>{
+  const pts=[{x:0,y:0},{x:0.1,y:0.25},{x:0.3,y:0.5},{x:0.6,y:0.9}]   // o último ponto está a 1,08 m
+  const provisional=alignInfo(pts.slice(0,3))!,final=alignInfo(pts)!,later=alignInfo([...pts,{x:2,y:-3}])!
   expect(provisional.final).toBe(false);expect(final.final).toBe(true);expect(final.anchorIndex).toBe(3)
   expect(final.points[3].x).toBeCloseTo(0);expect(final.points[3].y).toBeGreaterThan(1)
+  expect(later.anchorIndex).toBe(3);expect(later.points.slice(0,4)).toEqual(final.points)   // pontos novos não reorientam o que já foi desenhado
   expect(alignForward(pts)).toEqual(final.points)
  })
 })
@@ -117,4 +122,17 @@ describe('zoom, giro e deslocamento do mapa',()=>{
   const back=toScreen(v,{x:2,y:0});expect(back.x).toBeCloseTo(100);expect(back.y).toBeCloseTo(96)
   expect(wrapAngle(3*Math.PI)).toBeCloseTo(Math.PI);expect(wrapAngle(-Math.PI/2)).toBeCloseTo(-Math.PI/2)
  })
+})
+
+describe('escala da vista girada do editor',()=>{
+ it('não reduz sem rotação ou em múltiplos de 180°, e reduz o suficiente para a área girada caber',()=>{
+  expect(fitScaleForRotation(800,500,0)).toBe(1);expect(fitScaleForRotation(800,500,Math.PI)).toBeCloseTo(1)
+  expect(fitScaleForRotation(600,600,Math.PI/4)).toBeCloseTo(Math.SQRT1_2)
+  for(const [w,h] of [[800,500],[500,800],[600,600],[900,200]])for(let a=0;a<Math.PI*2;a+=0.17){
+   const k=fitScaleForRotation(w,h,a),c=Math.abs(Math.cos(a)),s=Math.abs(Math.sin(a))
+   expect(k*(w*c+h*s)).toBeLessThanOrEqual(w+1e-6);expect(k*(w*s+h*c)).toBeLessThanOrEqual(h+1e-6);expect(k).toBeGreaterThan(0)
+  }
+  expect(fitScaleForRotation(0,100,1)).toBe(1)
+ })
+ it('a 90° uma área larga precisa encolher até a altura caber na largura',()=>{expect(fitScaleForRotation(800,500,Math.PI/2)).toBeCloseTo(500/800)})
 })

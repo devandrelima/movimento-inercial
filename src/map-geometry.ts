@@ -1,22 +1,26 @@
 import type {Point} from './tracker'
 
-export const ALIGN_THRESHOLD=0.75
-export const ALIGN_PROVISIONAL=0.25
+export const ALIGN_THRESHOLD=1.0
+export const ALIGN_PROVISIONAL=0.3
 export type Alignment={points:Point[];anchorIndex:number;final:boolean}
 /**
  * The first sufficiently long estimated displacement defines the initial forward direction.
  * This only works if the user begins by walking straight; it is not a compass.
- * To start drawing earlier, the first point 25 cm away already gives a provisional direction; once the path is
- * 75 cm away, that point becomes the final anchor (the drawing may rotate slightly once). `anchorIndex`/`final`
- * let callers detect that change.
+ * To start drawing earlier, once the path is 30 cm long the farthest point so far gives a provisional direction
+ * (re-evaluated at every new point, so the drawing turns a little at a time instead of jumping); the first point
+ * 1 m away becomes the final anchor and freezes the direction. Measured on real walking starts, the direction error
+ * is ~15° at 25 cm, ~9° at 75 cm and ~6° at 1 m. `anchorIndex`/`final` let callers detect changes.
  */
 export function alignInfo(points:Point[], threshold=ALIGN_THRESHOLD, provisional=ALIGN_PROVISIONAL):Alignment | null {
   const origin=points[0]
   if (!origin) return null
   const far=(limit:number)=>points.findIndex(p=>Math.hypot(p.x-origin.x,p.y-origin.y)>=limit)
   let anchorIndex=far(threshold),final=anchorIndex>=0
-  if (!final) anchorIndex=far(Math.min(provisional,threshold))
-  if (anchorIndex<0) return null
+  if (!final) {
+    let best=0
+    points.forEach((p,i)=>{const d=Math.hypot(p.x-origin.x,p.y-origin.y);if(d>best){best=d;anchorIndex=i}})
+    if (best<Math.min(provisional,threshold)) return null
+  }
   const anchor=points[anchorIndex],dx=anchor.x-origin.x,dy=anchor.y-origin.y,length=Math.hypot(dx,dy)
   return {anchorIndex,final,points:points.map(p=>({x:(dy*(p.x-origin.x)-dx*(p.y-origin.y))/length,y:(dx*(p.x-origin.x)+dy*(p.y-origin.y))/length}))}
 }
@@ -103,4 +107,14 @@ export function rotateAbout(view:View, delta:number, pivot:Point, snap=0):View {
 /** Ponto do mundo (pixels da camada, Y para baixo) sob um ponto da tela relativo ao centro. */
 export function screenToLayer(view:View, p:Point):Point {
   return rotateVector({x:(p.x-view.offset.x)/view.scale,y:(p.y-view.offset.y)/view.scale},-view.rotation)
+}
+
+/**
+ * Fator de escala para que uma área `width × height` girada por `angle` (radianos) continue inteira dentro da área
+ * original (a vista girada do editor). 1 sem rotação; 1/√2 para um quadrado girado 45°.
+ */
+export function fitScaleForRotation(width:number, height:number, angle:number):number {
+  const c=Math.abs(Math.cos(angle)),s=Math.abs(Math.sin(angle))
+  if (width<=0 || height<=0) return 1
+  return Math.min(1,width/(width*c+height*s),height/(width*s+height*c))
 }

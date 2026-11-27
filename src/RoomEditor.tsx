@@ -2,7 +2,7 @@ import {useEffect,useLayoutEffect,useRef,useState,type PointerEvent} from 'react
 import {flushSync} from 'react-dom'
 import {DEFAULT_ROOM,facing,insideObstacle,MAX_ROOM_SIZE,roomAngle,validRoom,type Room,type Obstacle} from './room'
 import type {Point} from './tracker'
-import {gridStep} from './map-geometry'
+import {fitScaleForRotation,gesturePose,gridStep,rotateVector,wrapAngle} from './map-geometry'
 import {angleFromPoint,coversPoint,fitView,growView,hitTest,resizeRect,startGeometry,resizeRoom,VIEW_PAD,type HandleDir,type Hit,type Rect,type View} from './room-edit'
 import {useAuth} from './auth-ui'
 import PublishDialog from './PublishDialog'
@@ -25,7 +25,13 @@ type Gesture={pointer:number}&(
 const START_ID='__start__'
 type Frame=View&{sx:number;sy:number}
 const DIRS:{dir:HandleDir;sx:number;sy:number}[]=[{dir:'n',sx:0,sy:1},{dir:'s',sx:0,sy:-1},{dir:'e',sx:1,sy:0},{dir:'w',sx:-1,sy:0},{dir:'ne',sx:1,sy:1},{dir:'nw',sx:-1,sy:1},{dir:'se',sx:1,sy:-1},{dir:'sw',sx:-1,sy:-1}]
-const CURSOR:Record<HandleDir,string>={n:'ns-resize',s:'ns-resize',e:'ew-resize',w:'ew-resize',ne:'nesw-resize',sw:'nesw-resize',nw:'nwse-resize',se:'nwse-resize'}
+const DIR_ANGLE:Record<HandleDir,number>={n:0,ne:45,e:90,se:135,s:180,sw:225,w:270,nw:315}
+const SPIN_CURSORS=['ns-resize','nesw-resize','ew-resize','nwse-resize']
+/** Cursor de redimensionar de uma alça, considerando o giro da vista (uma aresta vertical girada 90° vira horizontal). */
+function cursorFor(dir:HandleDir,spin:number):string {
+ const deg=DIR_ANGLE[dir]+spin*180/Math.PI
+ return SPIN_CURSORS[(((Math.round(deg/45)%4)+4)%4)]
+}
 /** Desenha os pontos de controle de um retângulo (tamanhos em pixels de tela, via `ppu`). Quem recebe o toque é `hitTest`. */
 function Handles({rect,ppu}:{rect:Rect;ppu:number}) {
  const {x,y,width,height}=rect,u=(px:number)=>px/ppu
@@ -56,8 +62,11 @@ function StartMarker({x,y,angle,ppu,selected,placing,invalid}:{x:number;y:number
 export default function RoomEditor({initial,link,onSave,onPublished,onUnlinked,onCancel}:Props) {
  const [room,setRoom]=useState<Room>(()=>initial?structuredClone(initial):structuredClone(DEFAULT_ROOM))
  const [selected,setSelected]=useState<string|null>(null),[positionMode,setPositionMode]=useState(false),[attempted,setAttempted]=useState(false)
- const [frame,setFrame]=useState<Frame|null>(null),[ppu,setPpu]=useState(40)
+ const [frame,setFrame]=useState<Frame|null>(null)
  const [box,setBox]=useState({w:600,h:400}),[publishing,setPublishing]=useState(false)
+ // Giro da vista (radianos, horário na tela): só visual, não altera a sala. A área girada é encolhida para caber inteira.
+ const [spin,setSpin]=useState(0)
+ const spinRef=useRef(0),spinTween=useRef(0),wrap=useRef<HTMLDivElement>(null),touches=useRef(new Map<number,Point>()),spinGesture=useRef<{angle:number;spin:number}|null>(null)
  const auth=useAuth()
  const svg=useRef<SVGSVGElement>(null),drag=useRef<Gesture|null>(null),frameRef=useRef<Frame|null>(null),pointerRef=useRef<Point|null>(null),lastRoom=useRef<Room|null>(null),lastKey=useRef(''),loop=useRef(0),tween=useRef(0),lastTick=useRef(0)
  const object=room.obstacles.find(o=>o.id===selected)
@@ -67,16 +76,22 @@ export default function RoomEditor({initial,link,onSave,onPublished,onUnlinked,o
  // (zoom out contínuo) quando a sala chega ao limite da grade, mantendo a escala estável no resto do gesto.
  const rest:Frame={...fitView(safeWidth,safeHeight,box.w,box.h),sx:0,sy:0}
  const view=frame??rest
+ // Tamanho de layout da área de desenho (o getBoundingClientRect mudaria com o giro, o clientWidth não)
  useLayoutEffect(()=>{
-  const el=svg.current;if(!el)return
-  const measure=()=>{
-   const r=el.getBoundingClientRect(),w=Math.round(r.width*100)/100,h=Math.round(r.height*100)/100
-   setBox(b=>b.w===w&&b.h===h?b:{w,h})
-   const m=el.getScreenCTM();if(m&&m.a>0)setPpu(Math.round(m.a*100)/100)
-  }
+  const el=wrap.current;if(!el)return
+  const measure=()=>{const w=Math.round(el.clientWidth*100)/100,h=Math.round(el.clientHeight*100)/100;setBox(b=>b.w===w&&b.h===h?b:{w,h})}
   measure();const observer=new ResizeObserver(measure);observer.observe(el);return()=>observer.disconnect()
- },[view.x,view.y,view.w,view.h])
- useEffect(()=>()=>{cancelAnimationFrame(loop.current);cancelAnimationFrame(tween.current)},[])
+ },[])
+ const scaleK=fitScaleForRotation(box.w,box.h,spin)
+ /** Pixels de tela por metro: escala do viewBox (meet) vezes o encolhimento da vista girada. */
+ const ppu=Math.min(box.w/view.w,box.h/view.h)*scaleK
+ useEffect(()=>()=>{cancelAnimationFrame(loop.current);cancelAnimationFrame(tween.current);cancelAnimationFrame(spinTween.current)},[])
+ // Shift + roda do mouse gira a vista (listener nativo, para poder impedir a rolagem)
+ useEffect(()=>{
+  const el=wrap.current;if(!el)return
+  const wheel=(event:WheelEvent)=>{if(!event.shiftKey)return;event.preventDefault();applySpin(spinRef.current-(event.deltaY||event.deltaX)*0.003,true)}
+  el.addEventListener('wheel',wheel,{passive:false});return()=>el.removeEventListener('wheel',wheel)
+ })
  function commitFrame(next:Frame|null){frameRef.current=next;setFrame(next)}
  function update(patch:Partial<Room>){setRoom(r=>({...r,...patch}))}
  function updateObstacle(id:string,patch:Partial<Obstacle>){setRoom(r=>({...r,obstacles:r.obstacles.map(o=>o.id===id?{...o,...patch}:o)}))}
@@ -88,15 +103,40 @@ export default function RoomEditor({initial,link,onSave,onPublished,onUnlinked,o
  }
  /** Coordenadas da janela de edição (metros, Y para cima), sem limitar à sala. */
  function point(event:PointerEvent<SVGSVGElement>):Point|null {
-  const el=svg.current,m=el?.getScreenCTM();if(!el||!m)return null
-  const coord=el.createSVGPoint();coord.x=event.clientX;coord.y=event.clientY;const p=coord.matrixTransform(m.inverse())
-  return {x:p.x,y:-p.y}
+  return toView(event.clientX,event.clientY,view)
+ }
+ /** Centro da área de desenho na tela (o giro e o encolhimento são em torno dele). */
+ function center():Point|null{const r=wrap.current?.getBoundingClientRect();return r?{x:r.left+r.width/2,y:r.top+r.height/2}:null}
+ /** Ponto da tela → coordenadas da janela de edição (metros, Y para cima), desfazendo giro e encolhimento. */
+ function toView(clientX:number,clientY:number,f:{x:number;y:number;w:number;h:number}):Point|null {
+  const c=center();if(!c)return null
+  const k=fitScaleForRotation(box.w,box.h,spinRef.current),v=rotateVector({x:(clientX-c.x)/k,y:(clientY-c.y)/k},-spinRef.current)
+  const s=Math.min(box.w/f.w,box.h/f.h)
+  return {x:f.x+f.w/2+v.x/s,y:f.y+f.h/2-v.y/s}
+ }
+ function applySpin(next:number,snap=false){
+  let value=wrapAngle(next);if(snap&&Math.abs(value)<4*Math.PI/180)value=0
+  spinRef.current=value;setSpin(value)
+ }
+ /** Volta ao norte para cima com uma animação curta. */
+ function resetSpin(){
+  cancelAnimationFrame(spinTween.current);const from=spinRef.current,t0=performance.now()
+  const step=(now:number)=>{const k=Math.min(1,(now-t0)/180),e=1-(1-k)**3;applySpin(k>=1?0:from*(1-e));if(k<1)spinTween.current=requestAnimationFrame(step)}
+  spinTween.current=requestAnimationFrame(step)
  }
  const inRoom=(p:Point):Point=>({x:round(clamp(p.x,0,safeWidth)),y:round(clamp(p.y,0,safeHeight))})
  const roomLimits={minX:0,minY:0,maxX:safeWidth,maxY:safeHeight}
  function begin(event:PointerEvent<SVGSVGElement>,gesture:Gesture){drag.current=gesture;event.currentTarget.setPointerCapture(event.pointerId)}
  function down(event:PointerEvent<SVGSVGElement>){
   if(event.pointerType==='mouse'&&event.button!==0)return
+  // Segundo dedo (ou Shift com o mouse): gira a vista; qualquer arraste em andamento é encerrado
+  const c=center();touches.current.set(event.pointerId,{x:event.clientX,y:event.clientY})
+  if(c&&(touches.current.size>=2||(event.shiftKey&&event.pointerType==='mouse'))){
+   if(drag.current){const was=drag.current.kind==='room';drag.current=null;if(was){cancelAnimationFrame(loop.current);settle()}}
+   cancelAnimationFrame(spinTween.current);event.currentTarget.setPointerCapture(event.pointerId)
+   const pts=[...touches.current.values()],angle=pts.length>=2?gesturePose(pts[0],pts[1]).angle:Math.atan2(event.clientY-c.y,event.clientX-c.x)
+   spinGesture.current={angle,spin:spinRef.current};return
+  }
   const raw=point(event);if(!raw)return
   if(positionMode){update({start:inRoom(raw)});setPositionMode(false);return}
   const pointer=event.pointerId
@@ -127,9 +167,16 @@ export default function RoomEditor({initial,link,onSave,onPublished,onUnlinked,o
   if(event.pointerType==='touch'||positionMode)return
   const raw=point(event),el=svg.current;if(!raw||!el)return
   const hit:Hit=hitTest(hitRoom(),raw,{ppu,selectedId:selected,roomActive,startSelected})
-  el.style.cursor=!hit?'crosshair':hit.kind==='handle'?CURSOR[hit.dir]:hit.kind==='start'||hit.kind==='rotate'?'grab':'move'
+  el.style.cursor=!hit?'crosshair':hit.kind==='handle'?cursorFor(hit.dir,spinRef.current):hit.kind==='start'||hit.kind==='rotate'?'grab':'move'
  }
  function move(event:PointerEvent<SVGSVGElement>){
+  if(touches.current.has(event.pointerId))touches.current.set(event.pointerId,{x:event.clientX,y:event.clientY})
+  const sg=spinGesture.current
+  if(sg){
+   const pts=[...touches.current.values()],c=center()
+   const angle=pts.length>=2?gesturePose(pts[0],pts[1]).angle:c?Math.atan2(event.clientY-c.y,event.clientX-c.x):sg.angle
+   applySpin(sg.spin+(angle-sg.angle),true);return
+  }
   const g=drag.current,raw=point(event)
   if(!g){hover(event);return}
   if(g.pointer!==event.pointerId||!raw)return
@@ -151,13 +198,15 @@ export default function RoomEditor({initial,link,onSave,onPublished,onUnlinked,o
 
  /** Aplica o ponteiro à sala e afasta a janela se a sala chegou ao limite visível. */
  function stepRoom(ease=0){
-  const g=drag.current,el=svg.current,m=el?.getScreenCTM(),p=pointerRef.current,f=frameRef.current
-  if(!g||g.kind!=='room'||!el||!m||!p||!f)return
-  const next=resizeRoom(g.base,g.dir,{x:(p.x-m.e)/m.a+g.ox,y:-(p.y-m.f)/m.d+g.oy})
-  const r=el.getBoundingClientRect()
-  const vis={l:(r.left-m.e)/m.a,r:(r.right-m.e)/m.a,b:-(r.bottom-m.f)/m.d,t:-(r.top-m.f)/m.d}
+  const g=drag.current,p=pointerRef.current,f=frameRef.current
+  if(!g||g.kind!=='room'||!p||!f)return
+  const at=toView(p.x,p.y,f);if(!at)return
+  const next=resizeRoom(g.base,g.dir,{x:at.x+g.ox,y:at.y+g.oy})
+  // Janela visível, em coordenadas da vista (não depende do giro: o contêiner só é girado/encolhido por fora)
+  const s=Math.min(box.w/f.w,box.h/f.h),cx=f.x+f.w/2,cy=f.y+f.h/2
+  const vis={l:cx-box.w/(2*s),r:cx+box.w/(2*s),b:cy-box.h/(2*s),t:cy+box.h/(2*s)}
   const bounds={l:next.shift.x,r:next.shift.x+next.room.width,b:next.shift.y,t:next.shift.y+next.room.height}
-  const grown=growView(f,vis,bounds,VIEW_PAD/m.a,ease,1/m.a),nf:Frame={...grown,sx:next.shift.x,sy:next.shift.y}
+  const grown=growView(f,vis,bounds,VIEW_PAD/s,ease,1/s),nf:Frame={...grown,sx:next.shift.x,sy:next.shift.y}
   const key=[next.room.width,next.room.height,nf.x,nf.y,nf.w,nf.h,nf.sx,nf.sy].map(n=>Math.round(n*1e6)).join()
   if(key===lastKey.current)return
   lastKey.current=key;lastRoom.current=next.room
@@ -167,9 +216,9 @@ export default function RoomEditor({initial,link,onSave,onPublished,onUnlinked,o
  function tick(now:number){const dt=lastTick.current?Math.min(64,Math.max(0,now-lastTick.current)):16.7;lastTick.current=now;stepRoom(1-(1-0.3)**(dt/16.7));loop.current=requestAnimationFrame(tick)}
  /** Ao soltar, a janela desliza até o ajuste final da sala em vez de saltar. */
  function settle(){
-  const f=frameRef.current,el=svg.current,final=lastRoom.current
-  if(!f||!el||!final){commitFrame(null);return}
-  const r=el.getBoundingClientRect(),goal=fitView(final.width,final.height,r.width,r.height)
+  const f=frameRef.current,final=lastRoom.current
+  if(!f||!final){commitFrame(null);return}
+  const goal=fitView(final.width,final.height,box.w,box.h)
   const from={x:f.x-f.sx,y:f.y-f.sy,w:f.w,h:f.h},t0=performance.now()
   commitFrame({...from,sx:0,sy:0})
   const run=(now:number)=>{
@@ -180,7 +229,8 @@ export default function RoomEditor({initial,link,onSave,onPublished,onUnlinked,o
   }
   tween.current=requestAnimationFrame(run)
  }
- function end(){
+  function end(event?:PointerEvent<SVGSVGElement>){
+  if(event){touches.current.delete(event.pointerId);if(touches.current.size<2)spinGesture.current=null}
   const g=drag.current;drag.current=null
   if(g?.kind!=='room')return
   cancelAnimationFrame(loop.current);settle()
@@ -196,7 +246,8 @@ export default function RoomEditor({initial,link,onSave,onPublished,onUnlinked,o
  return <div className="room-page" role="main"><div className="room-editor">
   <header className="room-header"><div><span className="room-kicker">AMBIENTE</span><h1>Editor de sala</h1></div><div className="room-header-actions"><button className="room-ghost" onClick={onCancel}>Cancelar</button><button className="room-save" onClick={save}>Salvar sala</button><button className="room-publish" onClick={startPublish}>Publicar</button></div></header>
   <div className="room-layout"><section className="room-canvas-panel" aria-label="Planta da sala">
-   <div className="room-canvas-wrap"><svg ref={svg} className="room-canvas" viewBox={`${view.x} ${-(view.y+view.h)} ${view.w} ${view.h}`} preserveAspectRatio="xMidYMid meet" onPointerDown={down} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end} role="img" aria-label="Planta da sala com obstáculos e posição inicial">
+   {spin!==0&&<button type="button" className="room-compass" aria-label="Restaurar o norte para cima" onClick={resetSpin}><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><g style={{transformOrigin:'12px 12px',transform:`rotate(${spin}rad)`}}><path d="M12 3 L17 13 L12 11 L7 13 Z" fill="#126c70"/><path d="M12 21 L17 13 L12 11 L7 13 Z" fill="#b9cfcd"/></g></svg></button>}
+   <div className="room-canvas-wrap"><div ref={wrap} className="room-canvas-rot" style={spin===0?undefined:{transform:`rotate(${spin}rad) scale(${scaleK})`}} onKeyDown={event=>{if(event.key==='[')applySpin(spinRef.current-Math.PI/12,true);else if(event.key===']')applySpin(spinRef.current+Math.PI/12,true);else if(event.key==='0')resetSpin()}} tabIndex={0} aria-label="Planta da sala. Gire com dois dedos, Shift e a roda do mouse, ou as teclas [ e ]."><svg ref={svg} className="room-canvas" viewBox={`${view.x} ${-(view.y+view.h)} ${view.w} ${view.h}`} preserveAspectRatio="xMidYMid meet" onPointerDown={down} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end} role="img" aria-label="Planta da sala com obstáculos e posição inicial">
     <defs><pattern id="room-grid" width={grid} height={grid} patternUnits="userSpaceOnUse"><path d={`M ${grid} 0 L 0 0 0 ${grid}`} fill="none" stroke="#dbe8e6" strokeWidth={Math.max(.025,u(1))}/></pattern></defs>
     <g transform={`translate(${tx} ${ty})`} pointerEvents="none">
      <rect x="0" y={-safeHeight} width={safeWidth} height={safeHeight} fill="#f8fbfa"/><rect x="0" y={-safeHeight} width={safeWidth} height={safeHeight} fill="url(#room-grid)"/>
@@ -206,7 +257,7 @@ export default function RoomEditor({initial,link,onSave,onPublished,onUnlinked,o
      {object&&<Handles rect={object} ppu={ppu}/>}
      <StartMarker x={room.start.x} y={room.start.y} angle={roomAngle(room)} ppu={ppu} selected={startSelected} placing={positionMode} invalid={room.obstacles.some(o=>insideObstacle(room.start,o))}/>
     </g>
-   </svg></div>
+   </svg></div></div>
    {attempted&&!validRoom(room)&&<p className="room-error room-canvas-error" role="alert">Confira as medidas: sala de 1 a 500 m, obstáculos dentro dela e ponto inicial livre.</p>}
   </section><aside className="room-settings" aria-label="Configuração da sala">
    <div className="room-section"><div className="room-section-title"><h2>Dimensões da sala <span>(metros)</span></h2>{initial&&<button className="room-link room-danger" onClick={()=>{if(window.confirm('Remover a sala e os obstáculos salvos neste dispositivo?'))onSave(null)}}>Remover sala</button>}</div><div className="room-fields two"><NumberField label="Largura" value={room.width} onChange={width=>update({width})}/><NumberField label="Altura" value={room.height} onChange={height=>update({height})}/></div></div>
