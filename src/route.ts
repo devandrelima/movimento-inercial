@@ -21,23 +21,29 @@ function clearSegment(room:Room,a:Point,b:Point):boolean {
  return traversable(routeRoom(room),{x:a.x-m,y:a.y-m},{x:b.x-m,y:b.y-m})
 }
 export function clearPoint(room:Room,p:Point):boolean{return clearSegment(room,p,p)}
+/** O ponto está dentro da sala e fora dos obstáculos, mesmo que dentro da margem de 20 cm (ex.: origem encostada na parede). */
+export function freePoint(room:Room,p:Point):boolean{return traversable(room,p,p)}
 /** A* on a grid of `routeStep` (25 cm up to ~100 × 100 m); null means no route found at this resolution and clearance. */
 export function planRoute(room:Room,start:Point,goal:Point):Point[]|null {
- if(!clearPoint(room,start)||!clearPoint(room,goal))return null
- if(clearSegment(room,start,goal))return [start,goal]
+ // Origem e destino só precisam estar fisicamente livres; a margem vale para o trajeto. Assim uma origem
+ // encostada na parede ou um clique perto de um obstáculo ainda geram rota (a perna inicial/final sai da margem).
+ if(!freePoint(room,start)||!freePoint(room,goal))return null
+ const startClear=clearPoint(room,start),goalClear=clearPoint(room,goal)
+ if(startClear&&goalClear&&clearSegment(room,start,goal))return [start,goal]
  const expanded=routeRoom(room),m=ROUTE_CLEARANCE
  const clear=(a:Point,b:Point)=>traversable(expanded,{x:a.x-m,y:a.y-m},{x:b.x-m,y:b.y-m})
  const STEP=routeStep(room)
  const cols=Math.floor(room.width/STEP)+1,rows=Math.floor(room.height/STEP)+1,n=cols*rows
  const point=(i:number):Point=>({x:(i%cols)*STEP,y:Math.floor(i/cols)*STEP})
- const near=(p:Point)=>{
+ // Nós da grade ligados a um extremo. Extremo dentro da margem: liga só a nós com margem e sem cruzar obstáculos.
+ const near=(p:Point,pClear:boolean)=>{
   const out:number[]=[];const cx=Math.round(p.x/STEP),cy=Math.round(p.y/STEP)
   for(let y=Math.max(0,cy-2);y<=Math.min(rows-1,cy+2);y++)for(let x=Math.max(0,cx-2);x<=Math.min(cols-1,cx+2);x++){
-   const id=y*cols+x;if(clear(p,point(id)))out.push(id)
+   const id=y*cols+x,q=point(id);if(pClear?clear(p,q):clearPoint(room,q)&&traversable(room,p,q))out.push(id)
   }
   return out
  }
- const starts=near(start),ends=new Set(near(goal));if(!starts.length||!ends.size)return null
+ const starts=near(start,startClear),ends=new Set(near(goal,goalClear));if(!starts.length||!ends.size)return null
  const cost=new Float64Array(n);cost.fill(Infinity)
  const previous=new Int32Array(n);previous.fill(-1)
  const heap:{id:number;score:number;cost:number}[]=[]

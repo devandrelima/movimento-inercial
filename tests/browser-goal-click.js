@@ -36,9 +36,9 @@ async page => {
  c=await goals().boundingBox();near(c.x+c.width/2,p2.x,'novo marcador x');near(c.y+c.height/2,p2.y,'novo marcador y')
 
  // 3) Ponto inválido (dentro do obstáculo, 3..5 x 3..5) é recusado e o destino anterior permanece.
- const bad=at(4,4);await page.mouse.click(bad.x,bad.y);await page.getByText('Não dá para marcar o destino aí',{exact:false}).waitFor({timeout:3000})
+ const bad=at(4,4);await page.mouse.click(bad.x,bad.y);await page.getByText('fora da sala ou dentro de um obstáculo',{exact:false}).waitFor({timeout:3000})
  if(!(await summary()).includes('1.00, 9.00')||await goals().count()!==1)throw Error('Destino anterior deveria permanecer')
- const outside=at(12,4);await page.mouse.click(outside.x,outside.y);await page.getByText('Não dá para marcar o destino aí',{exact:false}).waitFor()
+ const outside=at(12,4);await page.mouse.click(outside.x,outside.y);await page.getByText('fora da sala ou dentro de um obstáculo',{exact:false}).waitFor()
  if(!(await summary()).includes('1.00, 9.00'))throw Error('Destino fora da sala não deveria ser aceito')
 
  // 4) Arrastar o mapa (pan) não escolhe destino.

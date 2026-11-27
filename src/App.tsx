@@ -7,7 +7,7 @@ import Map from './Map'
 import {initializeFrame,modelInput,type LocalFrame} from './frame'
 import {ModelClient} from './model-client'
 import {Tracker,type Segment,type Point} from './tracker'
-import {planRoute} from './route'
+import {freePoint,planRoute} from './route'
 import {loadRoom,ROOM_STORAGE_KEY,type Room} from './room'
 import {RoomPath,type MatchedPath} from './map-match'
 import RoomEditor from './RoomEditor'
@@ -195,14 +195,14 @@ function App({limited=false,refresh=false,onModelReady,onModelError,onModelProgr
     const x=Number(goalX),y=Number(goalY)
     if(!goalX.trim()||!goalY.trim()||!Number.isFinite(x)||!Number.isFinite(y)){setGoalError('Informe coordenadas X e Y válidas.');return}
     const next={x,y},route=planRoute(room,room.start,next)
-    if(!route){setGoalError('Não foi encontrada rota com margem de 20 cm. Confira o destino, a origem e os obstáculos.'+(goal?' O destino anterior permanece ativo.':''));return}
+    if(!route){setGoalError((freePoint(room,next)?'Não encontrei um caminho livre até esse destino; a rota mantém 20 cm de folga dos obstáculos.':'Esse destino está fora da sala ou dentro de um obstáculo.')+(goal?' O destino anterior permanece ativo.':''));return}
     goalRef.current=next;setGoal(next);setInitialRoute(route);setGoalError('');setGoalPanel(false)
   }
   /** Destino escolhido tocando no mapa: substitui o anterior (só existe um). Devolve o motivo se não for possível. */
   function pickGoal(point:Point):string|null {
     if(!room || started.current)return null
     const next={x:Math.round(point.x*100)/100,y:Math.round(point.y*100)/100},route=planRoute(room,room.start,next)
-    if(!route)return 'Não dá para marcar o destino aí: fora da sala, em um obstáculo ou sem rota com margem de 20 cm.'
+    if(!route)return freePoint(room,next)?'Não encontrei um caminho livre até aí; a rota mantém 20 cm de folga dos obstáculos.':'Esse ponto está fora da sala ou dentro de um obstáculo.'
     goalRef.current=next;setGoal(next);setInitialRoute(route);setGoalError('');setGoalX(String(next.x));setGoalY(String(next.y))
     return null
   }

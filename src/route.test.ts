@@ -1,6 +1,6 @@
 import {describe,it,expect} from 'vitest'
 import {DEFAULT_ROOM,traversable,type Room} from './room'
-import {clearPoint,distanceToRoute,planRoute,ROUTE_CLEARANCE,routeRoom,routeStep} from './route'
+import {clearPoint,distanceToRoute,freePoint,planRoute,ROUTE_CLEARANCE,routeRoom,routeStep} from './route'
 import {MapMatcher,RoomPath} from './map-match'
 
 const room:Room={...DEFAULT_ROOM,width:10,height:8,start:{x:1,y:4},obstacles:[{id:'mesa',x:4,y:3,width:2,height:2}]}
@@ -66,4 +66,39 @@ describe('rota em salas grandes',()=>{
   for(let i=1;i<path!.length;i++)expect(traversable(room,path![i-1],path![i])).toBe(true)
   expect(path!.some(p=>p.y>20)).toBe(true)
  },20000)
+})
+
+describe('origem e destino dentro da margem de 20 cm',()=>{
+ const obstacle={id:'a',x:4,y:3,width:2,height:2}
+ const interiorKeepsClearance=(r:Room,path:{x:number;y:number}[])=>{
+  const expanded=routeRoom(r),m=ROUTE_CLEARANCE,shift=(p:{x:number;y:number})=>({x:p.x-m,y:p.y-m})
+  // só o primeiro e o último trecho podem sair da margem; os do meio mantêm os 20 cm
+  for(let i=2;i<path.length-1;i++)expect(traversable(expanded,shift(path[i-1]),shift(path[i]))).toBe(true)
+  for(let i=1;i<path.length;i++)expect(traversable(r,path[i-1],path[i])).toBe(true)
+ }
+ it('origem no canto, encostada na parede ou a poucos cm de um obstáculo ainda gera rota',()=>{
+  for(const start of [{x:0,y:0},{x:0.05,y:4},{x:3.9,y:4},{x:10,y:8}]){
+   const r:Room={...DEFAULT_ROOM,width:10,height:8,start,obstacles:[obstacle]}
+   expect(clearPoint(r,start)).toBe(false);expect(freePoint(r,start)).toBe(true)
+   const goalPoint={x:8,y:6},path=planRoute(r,start,goalPoint)
+   expect(path,JSON.stringify(start)).not.toBeNull();expect(path![0]).toEqual(start);expect(path!.at(-1)).toEqual(goalPoint);interiorKeepsClearance(r,path!)
+  }
+ })
+ it('destino a poucos cm da parede ou do obstáculo também é aceito',()=>{
+  const r:Room={...DEFAULT_ROOM,width:10,height:8,start:{x:1,y:1},obstacles:[obstacle]}
+  for(const target of [{x:9.95,y:4},{x:6.1,y:4},{x:5,y:7.9}]){
+   expect(clearPoint(r,target)).toBe(false)
+   const path=planRoute(r,r.start,target);expect(path,JSON.stringify(target)).not.toBeNull();expect(path!.at(-1)).toEqual(target);interiorKeepsClearance(r,path!)
+  }
+ })
+ it('continua recusando pontos fora da sala ou dentro de obstáculos, e a origem encostada não atravessa obstáculos',()=>{
+  const r:Room={...DEFAULT_ROOM,width:10,height:8,start:{x:3.95,y:4},obstacles:[obstacle]}
+  expect(planRoute(r,r.start,{x:5,y:4})).toBeNull();expect(planRoute(r,r.start,{x:11,y:4})).toBeNull();expect(planRoute(r,r.start,{x:-1,y:4})).toBeNull()
+  const wall:Room={...r,start:{x:0.05,y:4},obstacles:[{id:'w',x:2,y:0,width:1,height:8}]}
+  expect(planRoute(wall,wall.start,{x:8,y:4})).toBeNull()
+ })
+ it('em sala grande (grade grossa) a origem na parede também gera rota',()=>{
+  const big:Room={...DEFAULT_ROOM,width:500,height:500,start:{x:0,y:0},obstacles:[{id:'w',x:100,y:0,width:2,height:400}]}
+  const path=planRoute(big,big.start,{x:300,y:100});expect(path).not.toBeNull();for(let i=1;i<path!.length;i++)expect(traversable(big,path![i-1],path![i])).toBe(true)
+ })
 })
