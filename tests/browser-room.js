@@ -7,12 +7,32 @@ async page => {
  await enter();await page.getByRole('button',{name:'Criar sala'}).click();
  await page.getByLabel('Largura',{exact:true}).fill('10');await page.getByLabel('Altura',{exact:true}).fill('8');
  await page.getByRole('button',{name:'Adicionar'}).click();
- const coords=await page.locator('.room-canvas').evaluate(el=>{const toScreen=(x,y)=>{const p=el.createSVGPoint();p.x=x;p.y=8-y;const q=p.matrixTransform(el.getScreenCTM());return{x:q.x,y:q.y}};return {from:toScreen(5,4),to:toScreen(6,5)}});
- await page.mouse.move(coords.from.x,coords.from.y);await page.mouse.down();await page.mouse.move(coords.to.x,coords.to.y,{steps:5});await page.mouse.up();
+ const screen=(x,y)=>page.locator('.room-canvas').evaluate((el,[x,y])=>{const p=el.createSVGPoint();p.x=x;p.y=-y;const q=p.matrixTransform(el.getScreenCTM());return{x:q.x,y:q.y}},[x,y]);
+ async function drag(from,to,steps=8){const a=await screen(...from),b=await screen(...to);await page.mouse.move(a.x,a.y);await page.mouse.down();await page.mouse.move(b.x,b.y,{steps});await page.mouse.up()}
+ await drag([5,4],[6,5],5);
  const draggedX=Number(await page.locator('.room-section').nth(2).getByLabel('X',{exact:true}).inputValue());if(Math.abs(draggedX-5.5)>.1)throw Error('Obstáculo não acompanhou o arraste: '+draggedX);
  const controls=page.locator('.room-section').nth(2);await controls.getByLabel('X',{exact:true}).fill('4');await controls.getByLabel('Y',{exact:true}).fill('3');await controls.getByLabel('Largura').fill('2');await controls.getByLabel('Altura').fill('2');
+ // Redimensionar por cantos e arestas, remodelar a sala e arrastar o ponto inicial (com mouse; toque exige aparelho real).
+ const field=(scope,label)=>scope.getByLabel(label,{exact:true}).inputValue().then(Number);
+ const dims=page.locator('.room-section').nth(0),startBox=page.locator('.room-section').nth(1);
+ const near=(value,expected,what)=>{if(Math.abs(value-expected)>.06)throw Error(what+': esperado '+expected+', obtido '+value)};
+ await drag([1,1],[2.5,1.5]);near(await field(startBox,'X (m)'),2.5,'início arrastado (X)');near(await field(startBox,'Y (m)'),1.5,'início arrastado (Y)');
+ await drag([2.5,1.5],[5,4]);{const x=await field(startBox,'X (m)'),y=await field(startBox,'Y (m)');if(x>=4&&x<=6&&y>=3&&y<=5)throw Error('Início entrou no obstáculo: '+x+','+y)}
+ await startBox.getByLabel('X (m)').fill('1');await startBox.getByLabel('Y (m)').fill('1');
+ await drag([6,4],[7,4]);near(await field(controls,'Largura'),3,'aresta direita (largura)');near(await field(controls,'Altura'),2,'aresta direita preserva altura');near(await field(controls,'X'),4,'aresta direita preserva X');
+ await drag([7,5],[8,6]);near(await field(controls,'Largura'),4,'canto superior direito (largura)');near(await field(controls,'Altura'),3,'canto superior direito (altura)');
+ await drag([4,4.5],[3,4.5]);near(await field(controls,'X'),3,'aresta esquerda (X)');near(await field(controls,'Largura'),5,'aresta esquerda (largura)');
+ await controls.getByLabel('X',{exact:true}).fill('4');await controls.getByLabel('Y',{exact:true}).fill('3');await controls.getByLabel('Largura').fill('2');await controls.getByLabel('Altura').fill('2');
+ await drag([8.5,7],[8.6,7.1],2);if(await controls.getByLabel('Largura').count()!==0)throw Error('Clique no vazio não desmarcou o obstáculo');
+ await drag([10,4],[12,4]);near(await field(dims,'Largura'),12,'aresta direita da sala');
+ await drag([12,4],[2,4]);near(await field(dims,'Largura'),6,'sala não encolhe além do obstáculo');
+ await drag([0,0],[-2,-1]);near(await field(dims,'Largura'),8,'canto inferior esquerdo (largura)');near(await field(dims,'Altura'),9,'canto inferior esquerdo (altura)');near(await field(startBox,'X (m)'),3,'início acompanha a origem da sala');
+ await dims.getByLabel('Largura').fill('10');await dims.getByLabel('Altura').fill('8');
+ const o=await screen(7,5);await page.mouse.click(o.x,o.y);near(await field(controls,'X'),6,'obstáculo deslocado com a sala');
+ await controls.getByLabel('X',{exact:true}).fill('4');await controls.getByLabel('Y',{exact:true}).fill('3');
+ await startBox.getByLabel('X (m)').fill('1');await startBox.getByLabel('Y (m)').fill('1');
  await page.getByRole('button',{name:'Marcar no mapa'}).click();
- const start=await page.locator('.room-canvas').evaluate(el=>{const p=el.createSVGPoint();p.x=1;p.y=6;const q=p.matrixTransform(el.getScreenCTM());return{x:q.x,y:q.y}});
+ const start=await screen(1,2);
  await page.mouse.click(start.x,start.y);if(Math.abs(Number(await page.getByLabel('Y (m)').inputValue())-2)>.05)throw Error('Ponto inicial não foi marcado');
  await page.getByLabel('X (m)').fill('5');await page.getByLabel('Y (m)').fill('4');await page.getByRole('button',{name:'Salvar sala'}).click();
  await page.getByRole('alert').waitFor();

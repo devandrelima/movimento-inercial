@@ -10,7 +10,7 @@ A aplicação publicada está em [embarcado.bemaqui.online](https://embarcado.be
 - Leitura de aceleração com gravidade, giroscópio e orientação; aquisição e inferência locais, sem GPS ou câmera.
 - Pré-processamento a 50 Hz e inferência com o modelo RoNIN v2 float32 no navegador, usando LiteRT.js e WebAssembly.
 - Trajetória em grade métrica com zoom, arraste, início, pausa, reset e exportação das leituras em CSV.
-- Editor de sala retangular, obstáculos, ponto e direção iniciais; correção experimental com filtro de partículas, comparação com o traço original e exportação das duas trajetórias.
+- Editor de sala retangular e obstáculos com redimensionamento por cantos e arestas, ponto inicial arrastável e direção inicial; correção experimental com filtro de partículas, comparação com o traço original e exportação das duas trajetórias.
 - Interface responsiva, build de produção em Docker e servidor Nginx no container.
 
 A versão INT8 está incluída para avaliação, mas a aplicação utiliza o modelo float32. O modelo e seus metadados estão em `public/models/`. O treinamento da v2 foi feito em outra máquina e seu código completo de treinamento não está neste repositório; `ml/` contém ferramentas anteriores de obtenção e inspeção dos dados. O dataset e os arquivos de trabalho não estão incluídos.
