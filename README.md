@@ -1,22 +1,65 @@
-# Norte — navegação inercial
+# Movimento inercial
 
-Projeto em desenvolvimento. A interface atual oferece diagnóstico de sensores; **não contém modelo treinado, inferência, trajetórias, experimentos nem deploy HTTPS**.
+Aplicação web experimental de navegação inercial para a disciplina de Sistemas Embarcados. O navegador do smartphone coleta dados dos sensores e executa localmente um modelo neural treinado com o dataset [RoNIN](https://ronin.cs.sfu.ca/), estimando deslocamentos e desenhando uma trajetória em duas dimensões.
 
-## Estado e restrições
+A aplicação publicada está em [embarcado.bemaqui.online](https://embarcado.bemaqui.online/). A estimativa é experimental: os resultados ainda precisam ser validados em caminhadas reais com referências medidas.
 
-A primeira parte do [RoNIN](https://www.frdr-dfdr.ca/repo/dataset/816d1e8c-1fc3-47ff-b8ea-a36ff51d682a) foi obtida e extraída; o conjunto de teste não visto está baixando. Ainda faltam sequências do protocolo oficial de treino e validação. Consulte `docs/ronin-sensores.md`. Dados e modelos têm licença específica para pesquisa não comercial; obtenha e consulte o LICENSE do dataset antes do uso.
+## Funcionalidades
 
-A VPS possui Nginx Proxy Manager em Docker nas portas 80/443 e outros serviços ativos. Não alterá-los. A memória disponível era cerca de 1,6 GiB no início; treinamento deve ser limitado e agendado de forma a preservar os serviços existentes. Nenhum serviço do projeto foi publicado.
+- Teste de compatibilidade dos sensores e permissões antes do uso.
+- Leitura de aceleração com gravidade, giroscópio e orientação; aquisição e inferência locais, sem GPS ou câmera.
+- Pré-processamento a 50 Hz e inferência com o modelo RoNIN v2 float32 no navegador, usando LiteRT.js e WebAssembly.
+- Trajetória em grade métrica com zoom, arraste, início, pausa, reset e exportação das leituras em CSV.
+- Editor de sala retangular, obstáculos, ponto e direção iniciais; correção experimental com filtro de partículas, comparação com o traço original e exportação das duas trajetórias.
+- Interface responsiva, build de produção em Docker e servidor Nginx no container.
 
-## Diagnóstico
+A versão INT8 está incluída para avaliação, mas a aplicação utiliza o modelo float32. O modelo e seus metadados estão em `public/models/`. O treinamento da v2 foi feito em outra máquina e seu código completo de treinamento não está neste repositório; `ml/` contém ferramentas anteriores de obtenção e inspeção dos dados. O dataset e os arquivos de trabalho não estão incluídos.
 
-`docker compose build` e `docker compose up -d` executam a interface experimental somente em 127.0.0.1:8197. `curl http://127.0.0.1:8197/health` verifica o servidor. Isso não oferece HTTPS nem habilita sensores em telefones remotos. `docker compose down` remove apenas os recursos deste Compose.
+Consulte [a documentação da integração](docs/integracao-modelo.md) para contrato de entrada e saída, métricas relatadas na entrega, calibração, limitações e detalhes da correção com mapa.
 
-O navegador informa aceleração incluindo gravidade em m/s² e rotação em graus/s, convertida para rad/s (alpha→X, beta→Y, gamma→Z, conforme a especificação W3C atual; confirmar em cada navegador). Valores ausentes são rejeitados. Convenções e sinais dependem do navegador e precisam de validação física antes de qualquer integração com treinamento. A frequência exibida é calculada sobre as últimas 100 leituras. Os dados ficam na memória do navegador e não são transmitidos pelo código da aplicação.
+## Requisitos
 
-## Próximos passos
+- Docker e Docker Compose para executar a aplicação.
+- Smartphone e navegador que forneçam acelerômetro, giroscópio e orientação; o teste inicial exige frequência de movimento de pelo menos 50 Hz.
+- HTTPS válido para acesso aos sensores em um aparelho remoto. O endereço `localhost` é útil para testes locais, mas não substitui HTTPS no celular.
 
-1. Completar os dados RoNIN e validar unidades, calibração, timestamps, orientação e compatibilidade com os sensores web.
-2. Construir e testar pipeline de divisões independentes, treinamento, métricas, quantização e comparação com execução no navegador.
-3. Implementar sessão, gravação, reprodução, experimentos e interface completa; validar em aparelhos reais.
-4. Configurar proxy e certificado após receber hostname e DNS; verificar saúde, HTTPS e modelo antes de declarar publicação.
+## Executar com Docker
+
+O Compose utiliza uma rede Docker externa chamada `automacao-net`, usada pelo proxy na VPS. Em uma instalação nova, crie-a uma vez se ela ainda não existir:
+
+```bash
+docker network inspect automacao-net >/dev/null 2>&1 || docker network create automacao-net
+cp .env.example .env
+docker compose build
+docker compose up -d
+docker compose ps
+```
+
+A aplicação fica disponível localmente em `http://127.0.0.1:8197` e o endpoint de saúde em `http://127.0.0.1:8197/health`. A porta pode ser alterada em `.env`. Para acesso remoto, configure um reverse proxy HTTPS para o container ou para essa porta local; preserve o Nginx e outros serviços existentes. O Compose usa reinício automático, limite de recursos, logs limitados e não monta o Docker socket.
+
+```bash
+docker compose logs -f
+docker compose down
+```
+
+`docker compose down` encerra os serviços deste projeto; a rede externa e serviços de outros projetos são preservados. Os arquivos do dataset não entram na imagem.
+
+## Testes e desenvolvimento
+
+Para compilar e executar os testes automatizados fora do container de produção, instale Node.js e npm compatíveis com a imagem de build:
+
+```bash
+npm ci
+npm run build
+npx vitest run
+```
+
+Os testes incluem sensores, permissões, janelas de 50 Hz, referencial, exportação, trajetória, geometria dos obstáculos e filtro de mapa. Os roteiros de navegador em `tests/` usam o CLI do Playwright e eventos de sensores simulados; eles não substituem testes físicos com um smartphone.
+
+## Limitações
+
+- A primeira saída do modelo chega por volta de 3 segundos e não reconstrói aproximadamente os primeiros 2,5 segundos. O usuário deve começar caminhando em linha reta para definir a direção inicial.
+- Leituras indisponíveis, baixa frequência, lacunas, movimento durante pausas e diferenças de calibração ou orientação entre aparelhos podem afetar o resultado.
+- O mapa restringe trajetórias impossíveis conforme a planta informada, mas não garante melhora de precisão nem detecta obstáculos ausentes ou movidos. Se não restarem hipóteses compatíveis, a correção é interrompida e o traço original continua disponível.
+- As métricas da v2, relatadas na entrega do treinamento, não são uma validação independente da aplicação em um smartphone. Consulte [o documento técnico](docs/integracao-modelo.md).
+- O RoNIN possui termos próprios de uso dos dados. Verifique a [licença do dataset](https://www.frdr-dfdr.ca/repo/files/8/published/publication_538/submitted_data/LICENSE.txt) e as condições aplicáveis aos artefatos derivados antes de reutilizá-los ou redistribuí-los.

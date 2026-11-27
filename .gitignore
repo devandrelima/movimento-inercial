@@ -30,3 +30,8 @@ dist-ssr
 data/
 
 artifacts/
+
+# Configuração local pode conter credenciais
+.env
+.env.*
+!.env.example
