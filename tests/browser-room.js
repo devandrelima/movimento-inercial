@@ -1,6 +1,8 @@
 async page => {
  await page.evaluate(()=>localStorage.removeItem('norte-room-v1'));await page.reload();
  async function enter(){
+  // Depois de uma visita aprovada o teste é pulado e o app abre direto na grade.
+  if(!await page.getByRole('button',{name:'Testar sensores'}).isVisible().catch(()=>false)&&await page.getByRole('button',{name:'Iniciar coleta'}).waitFor({timeout:60000}).then(()=>true).catch(()=>false))return;
   await page.getByRole('button',{name:'Testar sensores'}).click();await page.evaluate(()=>{let i=0;window.checkFeed=setInterval(()=>{window.dispatchEvent(new DeviceMotionEvent('devicemotion',{accelerationIncludingGravity:{x:0,y:0,z:9.81},rotationRate:{alpha:0,beta:0,gamma:0},interval:16}));if(i++%3===0)window.dispatchEvent(new DeviceOrientationEvent('deviceorientation',{alpha:0,beta:0,gamma:0,absolute:false}))},10)});
   await page.getByRole('button',{name:'Iniciar',exact:true}).waitFor({timeout:9000});await page.evaluate(()=>clearInterval(window.checkFeed));await page.getByRole('button',{name:'Iniciar',exact:true}).click();await page.getByRole('button',{name:'Iniciar coleta'}).waitFor({timeout:60000});
  }

@@ -22,7 +22,7 @@ async page => {
  await page.getByRole('button',{name:'Iniciar',exact:true}).waitFor({timeout:9000});await page.evaluate(()=>clearInterval(window.sensorFeed));
  await check('aprovado',['.compat-copy h1','.compat-result','.compat-primary','.phone-art img']);
  await page.route('**/models/ronin-v2-float.tflite',async route=>{await new Promise(resolve=>setTimeout(resolve,5000));await route.continue()});
- await page.getByRole('button',{name:'Iniciar',exact:true}).click();await page.getByText('Preparando o modelo').waitFor();
+ await page.getByRole('button',{name:'Iniciar',exact:true}).click();await page.getByRole('heading',{name:'Preparando o modelo'}).waitFor();
  await check('carregamento',['.loading-content h1','.model-loading-progress','.loading-symbol']);
  await page.getByRole('button',{name:'Iniciar coleta'}).waitFor({timeout:60000});
  await check('mapa',['.field','.instrument-head','.reading:nth-child(1)','.reading:nth-child(2)','.reading:nth-child(3)','.reset','.download','.play']);

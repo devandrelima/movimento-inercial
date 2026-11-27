@@ -1,4 +1,4 @@
-type Reply = {id:number;ok:boolean;error?:string;values?:number[];progress?:number}
+type Reply = {id:number;ok:boolean;error?:string;values?:number[];progress?:number;cached?:boolean}
 type Pending = {resolve:(value:Reply)=>void;reject:(error:Error)=>void;timer:number;onProgress?:(value:number)=>void}
 export class ModelClient {
   private worker:Worker
@@ -21,15 +21,16 @@ export class ModelClient {
     for (const task of this.pending.values()) {window.clearTimeout(task.timer);task.reject(error)}
     this.pending.clear()
   }
-  private request(type:'init'|'predict',values?:Float32Array,onProgress?:(value:number)=>void):Promise<Reply> {
+  private request(type:'init'|'predict',values?:Float32Array,onProgress?:(value:number)=>void,refresh?:boolean):Promise<Reply> {
     const id=++this.sequence
     return new Promise((resolve,reject)=>{
       const timer=window.setTimeout(()=>this.fail(new Error(type==='init' ? 'Tempo esgotado ao carregar a IA' : 'Tempo esgotado na inferência')),type==='init'?60000:10000)
       this.pending.set(id,{resolve,reject,timer,onProgress})
-      try {this.worker.postMessage({id,type,values})} catch(error) {this.fail(error instanceof Error?error:new Error('Erro na IA'))}
+      try {this.worker.postMessage({id,type,values,refresh})} catch(error) {this.fail(error instanceof Error?error:new Error('Erro na IA'))}
     })
   }
-  async initialize(onProgress?:(value:number)=>void):Promise<void> {await this.request('init',undefined,onProgress)}
+  /** Carrega o modelo (do cache local quando instalado e íntegro). `refresh` ignora o cache e baixa de novo. Devolve se ficou instalado. */
+  async initialize(onProgress?:(value:number)=>void,options:{refresh?:boolean}={}):Promise<{cached:boolean}> {const reply=await this.request('init',undefined,onProgress,options.refresh);return {cached:reply.cached===true}}
   async predict(values:Float32Array):Promise<[number,number]> {
     const result=await this.request('predict',values)
     if (!result.values || result.values.length!==2 || !result.values.every(Number.isFinite)) throw new Error('Saída inválida da IA')

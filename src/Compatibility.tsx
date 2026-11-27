@@ -1,6 +1,7 @@
 import {useEffect,useRef,useState} from 'react'
 import {sensorPermissions} from './sensors'
 import {SensorCheck} from './sensor-check'
+import {saveDeviceCheck} from './startup'
 import './Compatibility.css'
 
 /** Duração do teste de sensores, em segundos. */
@@ -32,7 +33,7 @@ export default function Compatibility({onStart,onSkip}:{onStart:()=>void;onSkip:
    const left=Math.max(0,Math.ceil((TEST_SECONDS*1000-(performance.now()-start))/1000));setRemaining(left)
    if(left>0)return
    cleanup.current();const result=check.result()
-   if(result.compatible)setState('success')
+   if(result.compatible){saveDeviceCheck();setState('success')}
    else {setFailure(`Não recebemos leituras suficientes: ${result.missing.join(', ')}. Confira as permissões e tente novamente.`);setState('failure')}
   },100)
   cleanup.current=()=>{window.clearInterval(timer);window.removeEventListener('devicemotion',motion);window.removeEventListener('deviceorientation',orientation)}

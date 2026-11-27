@@ -8,7 +8,7 @@ async page => {
  await page.getByRole('button',{name:'Iniciar',exact:true}).waitFor({timeout:9000});await page.evaluate(()=>clearInterval(window.testFeed));
  let attempts=0;await page.route('**/models/ronin-v2-float.tflite',async route=>{attempts++;if(attempts===1){await route.abort();return}await new Promise(resolve=>setTimeout(resolve,2000));await route.continue()});
  await page.getByRole('button',{name:'Iniciar',exact:true}).click();await page.getByText('Não foi possível carregar o modelo').waitFor({timeout:10000});
- await page.getByRole('button',{name:'Tentar novamente'}).click();await page.getByText('Preparando o modelo').waitFor({timeout:5000});
+ await page.getByRole('button',{name:'Tentar novamente'}).click();await page.getByRole('heading',{name:'Preparando o modelo'}).waitFor({timeout:5000});
  await page.getByRole('button',{name:'Iniciar coleta'}).waitFor({timeout:60000});
  const status='modelo pronto; mapa aberto';
  return {ausencia:failure,teste:'sensores detectados',loading:'erro, nova tentativa e download verificados',modelo:status,aplicacao:'aberta'};

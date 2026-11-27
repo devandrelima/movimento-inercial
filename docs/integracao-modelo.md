@@ -30,6 +30,15 @@ Antes de iniciar, o usuário autoriza os sensores e movimenta o aparelho durante
 
 Depois que o usuário toca em Iniciar, a página mostra o carregamento real do modelo e só abre o mapa quando o carregamento e o teste de compatibilidade do modelo terminam. Em caso de erro, é possível tentar novamente. A aquisição de rastreamento começa apenas ao tocar em play na tela do mapa.
 
+### Lembrar o teste e o modelo instalado
+
+Para não repetir o teste a cada visita, o navegador guarda duas coisas, só neste aparelho:
+
+- **Teste aprovado** (`localStorage`, chave `norte-device-check-v1`), gravado quando o teste passa. Reprovação não é lembrada. O botão **Refazer teste** (painel de leituras, antes de iniciar a coleta) apaga esse registro e volta ao teste.
+- **Modelo instalado**: o arquivo `ronin-v2-float.tflite` fica no Cache Storage (`norte-model-v1`) depois de baixado e verificado pelo hash SHA-256, e o hash instalado fica em `norte-model-installed-v1`.
+
+Ao abrir o site: sem teste aprovado, vai para o teste; com teste aprovado e o modelo instalado **igual ao usado pelo sistema** (mesmo hash, arquivo ainda no cache), abre direto na grade e o modelo é carregado do armazenamento local, sem baixar de novo (o play fica desabilitado até o modelo ficar pronto); com teste aprovado mas modelo ausente, apagado pelo navegador ou de outra versão (por exemplo, depois de uma atualização do sistema), vai direto para a tela de download, sem repetir o teste. Toda cópia do cache é conferida pelo hash antes do uso; se não conferir, é descartada e o modelo é baixado de novo. Se o carregamento falhar, o registro é apagado e a tela de download mostra o erro, com nova tentativa que ignora o cache. Sem Cache Storage (por exemplo, modo privado restrito) o modelo é baixado a cada visita, mas o teste continua lembrado.
+
 ### Aparelho que não passa no teste
 
 Se o teste falhar, além de tentar de novo é possível abrir a tela do mapa sem sensores. Nesse modo o modelo não é carregado nem baixado, os botões de play e de reset ficam desabilitados e, ao tocá-los, a página informa que o aparelho não consegue rodar o modelo. Criar, editar e carregar mapas (inclusive os públicos) continua funcionando normalmente.
